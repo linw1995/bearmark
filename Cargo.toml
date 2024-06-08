@@ -6,8 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# web server
-rocket = "0.5.1"
+rocket = { version = "0.5.1", features = ["json"] }
 
 # database
 diesel = { version = "2.2.0", features = ["postgres", "time"] }
@@ -15,6 +14,7 @@ diesel = { version = "2.2.0", features = ["postgres", "time"] }
 ##################
 # other utilities
 ##################
+serde = { version = "1.0.203", features = ["derive"] }
 time = { version = "0.3.36", features = ["local-offset", "macros", "serde"] }
 # read settings from envorionment variables
 dotenvy = "0.15.7"
