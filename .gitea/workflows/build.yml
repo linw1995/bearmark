@@ -1,4 +1,4 @@
-name: Rust
+name: Build And Test
 
 on:
   push:
@@ -11,7 +11,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-rust-latest
+    runs-on: ubuntu-rust-musl-latest
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -25,13 +25,6 @@ jobs:
         export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
         echo ">>> Print Sccache infos"
         sccache -s
-
-        echo ">>> Install Rust target"
-        rustup target add x86_64-unknown-linux-musl
-
-        echo ">>> Install dependencies"
-        apt update
-        apt install -y musl-dev musl-tools
 
         echo ">>> Build project"
         cargo build --target x86_64-unknown-linux-musl --release --verbose
