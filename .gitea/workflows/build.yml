@@ -2,9 +2,9 @@ name: Build And Test
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -26,31 +26,48 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+    env:
+      RUSTC_WRAPPER: "sccache"
+      # SCCACHE_LOG: debug
+      # SCCACHE_ERROR_LOG: /tmp/sccache_log.txt
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    - name: Build 
-      run: |
-        export SCCACHE_BUCKET=${{ secrets.SCCACHE_BUCKET }}
-        export SCCACHE_REGION=${{ secrets.SCCACHE_REGION }}
-        export SCCACHE_ENDPOINT=${{ secrets.SCCACHE_ENDPOINT }}
-        export SCCACHE_S3_USE_SSL=${{ secrets.SCCACHE_S3_USE_SSL }}
-        export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-        export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        echo ">>> Print Sccache infos"
-        sccache -s
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Sccache Action
+        uses: Mozilla-Actions/sccache-action@v0.0.4
+        with:
+          version: v0.8.1
+      - name: Setup Sccache
+        run: |
+          mkdir -p ~/.aws/
+          cat <<EOF >~/.aws/credentials
+          [default]
+          aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EOF
 
-        echo ">>> Setup environment"
-        ./scripts/cli.sh install-diesel
-        ./scripts/cli.sh setup
+          mkdir -p ~/.config/sccache/
+          cat <<EOF >~/.config/sccache/config
+          [cache.s3]
+          bucket = "${{ vars.SCCACHE_BUCKET }}"
+          region = "${{ vars.SCCACHE_REGION }}"
+          endpoint = "${{ vars.SCCACHE_ENDPOINT }}"
+          use_ssl = ${{ vars.SCCACHE_S3_USE_SSL }}
+          key_prefix = ""
+          no_credentials = false
+          EOF
 
-        export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl 
+          sccache --stop-server || sccache --start-server
+      - name: Build
+        run: |
+          echo ">>> Setup environment"
+          ./scripts/cli.sh install-diesel
+          ./scripts/cli.sh setup
 
-        echo ">>> Build project"
-        cargo build --release --verbose
+          export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl 
 
-        echo ">>> Run tests"
-        ./scripts/cli.sh test
+          echo ">>> Build project"
+          cargo build --release --verbose
 
-        echo ">>> Print Sccache infos"
-        sccache -s
+          echo ">>> Run tests"
+          ./scripts/cli.sh test
