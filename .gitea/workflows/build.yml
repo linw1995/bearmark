@@ -10,8 +10,22 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-rust-musl-latest
+    services:
+      db:
+        image: postgres:12
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: example
+          POSTGRES_DB: bmm
+        options: >-
+          --health-cmd 'pg_isready -q -U postgres'
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -26,5 +40,17 @@ jobs:
         echo ">>> Print Sccache infos"
         sccache -s
 
+        echo ">>> Setup environment"
+        ./scripts/cli.sh install-diesel
+        ./scripts/cli.sh setup
+
+        export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl 
+
         echo ">>> Build project"
-        cargo build --target x86_64-unknown-linux-musl --release --verbose
+        cargo build --release --verbose
+
+        echo ">>> Run tests"
+        ./scripts/cli.sh test
+
+        echo ">>> Print Sccache infos"
+        sccache -s

@@ -12,6 +12,7 @@ help() {
 	echo "Actions:"
 	echo "  -h, --help: Display this help message"
 	echo "  setup: Setup the project development environment"
+	echo "  teardown: Teardown the project development environment"
 	echo "  serve: Run the api server"
 	echo "  test: Run tests"
 	echo "  install-diesel: Install diesel_cli"
@@ -34,11 +35,21 @@ main() {
 		exit
 		;;
 	"setup")
-		echo ">>> Setting up the project development environment"
-		docker compose up -d
+		if [[ -z "${CI-}" ]]; then
+      echo ">>> Setting up the project development environment"
+      docker compose up -d --wait
+      echo "DATABASE_URL=postgres://postgres:example@localhost:5432/bmm" >.env
+		else
+      echo ">>> Skip setting up the project development environment"
+      echo "DATABASE_URL=postgres://postgres:example@db:5432/bmm" >.env
+		fi
 		echo ">>> Setting up database"
-		echo "DATABASE_URL=postgres://postgres:example@localhost/bmm" >.env
 		diesel migration run
+		echo ">>> Done"
+		;;
+	"teardown")
+		echo ">>> Tearing down the project development environment"
+		docker compose down
 		echo ">>> Done"
 		;;
 	"serve")

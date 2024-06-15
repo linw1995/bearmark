@@ -1,7 +1,7 @@
 version: '3'
 services:
   db:
-    image: postgres
+    image: postgres:12
     restart: always
     ports:
       - 5432:5432
@@ -9,3 +9,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: example
       POSTGRES_DB: bmm
+    healthcheck :
+      test: [ "CMD", "pg_isready", "-q", "-U", "postgres" ]
+      interval : 5s
+      timeout : 5s
+      retries : 5
