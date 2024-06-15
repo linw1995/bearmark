@@ -1,7 +1,7 @@
 use diesel::prelude::*;
-use rocket::serde::Deserialize;
+use rocket::serde::{Deserialize, Serialize};
 
-#[derive(Queryable, Selectable, Debug)]
+#[derive(Queryable, Selectable, Debug, Deserialize, Serialize)]
 #[diesel(table_name = crate::schema::bookmarks)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Bookmark {
@@ -11,7 +11,7 @@ pub struct Bookmark {
     pub created_at: time::OffsetDateTime,
 }
 
-#[derive(Insertable, Debug, Deserialize)]
+#[derive(Insertable, Debug, Deserialize, Serialize)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = crate::schema::bookmarks)]
 pub struct NewBookmark {
