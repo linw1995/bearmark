@@ -35,6 +35,7 @@ main() {
 	export LIBRARY_PATH=${LIBRARY_PATH-}:/opt/homebrew/opt/libpq/lib/
 
 	action=${1-}
+	shift 1
 
 	case $action in
 	"" | "-h" | "--help")
@@ -69,11 +70,11 @@ main() {
 		;;
 	"test")
 		echo ">>> Running tests"
-		cargo test -- --show-output || rm -f *.profraw
+		cargo test -- --show-output "$@"
 		;;
 	"coverage")
 		echo ">>> Running tests with coverage"
-		cargo tarpaulin --out html --skip-clean -- --show-output
+		cargo tarpaulin --out html --skip-clean -- --show-output "$@"
 		echo "open file ./tarpaulin-report.html to see coverage report"
 		;;
 	"install-deps")

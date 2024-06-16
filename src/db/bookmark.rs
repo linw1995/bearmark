@@ -20,9 +20,11 @@ pub fn search_bookmarks(title: &str, before: i32, limit: i64) -> Vec<Bookmark> {
 
     let mut conn = connection::establish();
 
-    let mut query = bookmarks::table
-        .filter(bookmarks::dsl::title.like(format!("%{}%", title)))
-        .into_boxed();
+    let mut query = bookmarks::table.into_boxed();
+
+    if !title.is_empty() {
+        query = query.filter(bookmarks::dsl::title.like(format!("%{}%", title)))
+    }
 
     if before > 0 {
         query = query.filter(bookmarks::dsl::id.lt(before))
@@ -44,7 +46,7 @@ pub struct NewBookmark {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::super::connection;
     use super::*;
     use tracing::info;
@@ -91,7 +93,7 @@ mod tests {
     }
 
     #[test]
-    fn search_bookmarks_with_pagination() {
+    pub fn search_bookmarks_with_pagination() {
         clean_bookmarks();
 
         let values = vec![
@@ -122,13 +124,32 @@ mod tests {
             .execute(&mut connection::establish())
             .expect("Error saving new bookmarks");
 
+        let results = search_bookmarks("", 0, 10);
+        assert!(
+            results.len() >= 5,
+            "Expected more than 5 bookmarks, got {}",
+            results.len()
+        );
+
         let results = search_bookmarks("Weather", 0, 10);
-        assert!(results.len() == 3);
+        assert!(
+            results.len() == 3,
+            "Expected 3 bookmarks, got {}",
+            results.len()
+        );
 
         let results = search_bookmarks("Weather", 0, 2);
-        assert!(results.len() == 2);
+        assert!(
+            results.len() == 2,
+            "Expected 2 bookmarks, got {}",
+            results.len()
+        );
 
         let results = search_bookmarks("Weather", results[1].id, 2);
-        assert!(results.len() == 1);
+        assert!(
+            results.len() == 1,
+            "Expected 1 bookmarks, got {}",
+            results.len()
+        );
     }
 }

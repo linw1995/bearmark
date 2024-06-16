@@ -5,5 +5,5 @@ use bmm::api::bookmark;
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", bookmark::routes())
+    rocket::build().mount("/bookmarks", bookmark::routes())
 }
