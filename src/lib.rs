@@ -9,7 +9,6 @@ fn init() {
     let console_log = tracing_subscriber::fmt::layer()
         .pretty()
         .with_writer(io::stdout)
-        .with_filter(LevelFilter::INFO)
         .boxed();
 
     tracing_subscriber::registry()
