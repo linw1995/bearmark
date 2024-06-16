@@ -11,12 +11,15 @@ help() {
 	echo "Usage: ./cli.sh <action>"
 	echo "Actions:"
 	echo "  -h, --help: Display this help message"
+	echo ""
+	echo "  lint: Run clippy"
+	echo ""
 	echo "  setup: Setup the project development environment"
 	echo "  teardown: Teardown the project development environment"
 	echo "  serve: Run the api server"
 	echo "  test: Run tests"
 	echo "  coverage: Run tests with coverage"
-
+	echo ""
 	echo "  install-deps: Install all dependencies"
 	echo "  install-diesel: Install diesel_cli"
 	echo "  install-tarpaulin: Install tarpaulin"
@@ -37,6 +40,10 @@ main() {
 	"" | "-h" | "--help")
 		help
 		exit
+		;;
+	"lint")
+		echo ">>> Running clippy"
+		cargo clippy --all-features
 		;;
 	"setup")
 		if [[ -z "${CI-}" ]]; then

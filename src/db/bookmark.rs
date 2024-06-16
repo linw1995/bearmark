@@ -28,13 +28,11 @@ pub fn search_bookmarks(title: &str, before: i32, limit: i64) -> Vec<Bookmark> {
         query = query.filter(bookmarks::dsl::id.lt(before))
     }
 
-    let results = query
+    query
         .order_by(bookmarks::dsl::id.desc())
         .limit(limit)
         .load::<Bookmark>(&mut conn)
-        .expect("Error search bookmarks");
-
-    results
+        .expect("Error search bookmarks")
 }
 
 #[derive(Insertable, Debug, Deserialize, Serialize)]
