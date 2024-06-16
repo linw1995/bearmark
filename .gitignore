@@ -19,3 +19,4 @@ Cargo.lock
 .env*
 .vscode
 tarpaulin-report.html
+*.profraw

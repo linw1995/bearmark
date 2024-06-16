@@ -1,15 +1,18 @@
 #[macro_use]
 extern crate rocket;
 
-use bmm::models::{Bookmark, NewBookmark};
+use bmm::db::bookmark::{Bookmark, NewBookmark};
+use bmm::db::connection;
+use bmm::db::schema::bookmarks;
+
 use diesel::{RunQueryDsl, SelectableHelper};
 use rocket::serde::json::Json;
 
 #[post("/bookmark", format = "application/json", data = "<bookmark>")]
 fn create_bookmark(bookmark: Json<NewBookmark>) -> Json<Bookmark> {
-    let mut conn = bmm::establish_connection();
+    let mut conn = connection::establish();
 
-    let m = diesel::insert_into(bmm::schema::bookmarks::table)
+    let m = diesel::insert_into(bookmarks::table)
         .values(&bookmark.into_inner())
         .returning(Bookmark::as_returning())
         .get_result(&mut conn)
@@ -25,8 +28,7 @@ fn rocket() -> _ {
 
 #[cfg(test)]
 mod test {
-    use super::rocket;
-    use bmm::models::{Bookmark, NewBookmark};
+    use super::*;
     use rocket::http::Status;
     use rocket::local::blocking::Client;
 
