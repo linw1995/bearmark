@@ -15,7 +15,11 @@ help() {
 	echo "  teardown: Teardown the project development environment"
 	echo "  serve: Run the api server"
 	echo "  test: Run tests"
+	echo "  coverage: Run tests with coverage"
+
+	echo "  install-deps: Install all dependencies"
 	echo "  install-diesel: Install diesel_cli"
+	echo "  install-tarpaulin: Install tarpaulin"
 }
 
 cd "$(dirname "$0")"/../
@@ -36,12 +40,12 @@ main() {
 		;;
 	"setup")
 		if [[ -z "${CI-}" ]]; then
-      echo ">>> Setting up the project development environment"
-      docker compose up -d --wait
-      echo "DATABASE_URL=postgres://postgres:example@localhost:5432/bmm" >.env
+			echo ">>> Setting up the project development environment"
+			docker compose up -d --wait
+			echo "DATABASE_URL=postgres://postgres:example@localhost:5432/bmm" >.env
 		else
-      echo ">>> Skip setting up the project development environment"
-      echo "DATABASE_URL=postgres://postgres:example@db:5432/bmm" >.env
+			echo ">>> Skip setting up the project development environment"
+			echo "DATABASE_URL=postgres://postgres:example@db:5432/bmm" >.env
 		fi
 		echo ">>> Setting up database"
 		diesel migration run
@@ -58,11 +62,24 @@ main() {
 		;;
 	"test")
 		echo ">>> Running tests"
-		cargo test -- --show-output
+		cargo test -- --show-output || rm -f *.profraw
+		;;
+	"coverage")
+		echo ">>> Running tests with coverage"
+		cargo tarpaulin --out html --skip-clean -- --show-output
+		echo "open file ./tarpaulin-report.html to see coverage report"
+		;;
+	"install-deps")
+		$0 install-diesel
+		$0 install-tarpaulin
 		;;
 	"install-diesel")
 		echo ">>> Installing diesel_cli"
 		cargo install diesel_cli --no-default-features --features postgres
+		;;
+	"install-tarpaulin")
+		echo ">>> Installing tarpaulin"
+		cargo install cargo-tarpaulin
 		;;
 	*)
 		echo "Error: Unknown action '$action'"

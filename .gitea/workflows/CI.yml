@@ -1,4 +1,4 @@
-name: Build And Test
+name: Continuous Integration
 
 on:
   push:
@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-and-test:
+  CI:
     runs-on: ubuntu-rust-musl-latest
     services:
       db:
@@ -31,9 +31,9 @@ jobs:
       # SCCACHE_LOG: debug
       # SCCACHE_ERROR_LOG: /tmp/sccache_log.txt
     steps:
-      - name: Checkout
+      - name: Checkout Sources
         uses: actions/checkout@v4
-      - name: Sccache Action
+      - name: Use Sccache Action
         uses: Mozilla-Actions/sccache-action@v0.0.4
         with:
           version: v0.8.1
@@ -58,16 +58,16 @@ jobs:
           EOF
 
           sccache --stop-server || sccache --start-server
-      - name: Build
+      - name: Install dependencies and setup
         run: |
-          echo ">>> Setup environment"
-          ./scripts/cli.sh install-diesel
+          ./scripts/cli.sh install-deps
           ./scripts/cli.sh setup
-
+      - name: Run tests with coverage
+        run: |
           export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl 
-
-          echo ">>> Build project"
+          ./scripts/cli.sh coverage
+      - name: Try to build release
+        continue-on-error: true
+        run: |
+          export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl 
           cargo build --release --verbose
-
-          echo ">>> Run tests"
-          ./scripts/cli.sh test

@@ -23,10 +23,11 @@ pub struct NewBookmark {
 mod tests {
     use super::*;
     use crate::establish_connection;
+    use crate::schema::bookmarks;
     use tracing::info;
 
     #[test]
-    fn test_create_bookmark() {
+    fn create_bookmark() {
         let mut conn = establish_connection();
 
         let new_bookmark = NewBookmark {
@@ -34,7 +35,7 @@ mod tests {
             url: "https://example.com".to_string(),
         };
 
-        let m = diesel::insert_into(crate::schema::bookmarks::table)
+        let m = diesel::insert_into(bookmarks::table)
             .values(&new_bookmark)
             .returning(Bookmark::as_returning())
             .get_result(&mut conn)
@@ -42,5 +43,20 @@ mod tests {
 
         info!("{:?}", m);
         assert!(m.id > 0);
+    }
+
+    #[test]
+    fn title_search_bookmark() {
+        create_bookmark();
+
+        let mut conn = establish_connection();
+        let results = bookmarks::table
+            .filter(bookmarks::dsl::title.like("%test%"))
+            .order_by(bookmarks::dsl::created_at.desc())
+            .load::<Bookmark>(&mut conn)
+            .expect("Error loading bookmarks");
+
+        assert!(results.len() > 0);
+        info!("{:?}", results[0]);
     }
 }

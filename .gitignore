@@ -18,3 +18,4 @@ Cargo.lock
 # Customizations
 .env*
 .vscode
+tarpaulin-report.html
