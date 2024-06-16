@@ -93,6 +93,7 @@ pub(crate) mod tests {
     }
 
     #[test]
+    #[serial(search_bookmarks)]
     pub fn search_bookmarks_with_pagination() {
         clean_bookmarks();
 

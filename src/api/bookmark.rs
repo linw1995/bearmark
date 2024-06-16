@@ -62,6 +62,7 @@ mod test {
     }
 
     #[test]
+    #[serial(search_bookmarks)]
     fn search_bookmarks() {
         // Create some bookmarks
         crate::db::bookmark::tests::search_bookmarks_with_pagination();
