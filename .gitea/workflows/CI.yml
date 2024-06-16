@@ -74,4 +74,5 @@ jobs:
         continue-on-error: true
         run: |
           export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl 
-          cargo build --release --verbose
+          cargo build --bin serve --release --verbose
+          find . -name serve -type f
