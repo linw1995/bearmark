@@ -65,7 +65,7 @@ main() {
 		;;
 	"serve")
 		echo ">>> Running the api server"
-		cargo run
+		cargo run --bin serve
 		;;
 	"test")
 		echo ">>> Running tests"

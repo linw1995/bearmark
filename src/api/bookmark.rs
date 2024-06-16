@@ -1,15 +1,12 @@
-#[macro_use]
-extern crate rocket;
-
-use bmm::db::bookmark::{Bookmark, NewBookmark};
-use bmm::db::connection;
-use bmm::db::schema::bookmarks;
+use crate::db::bookmark::{Bookmark, NewBookmark};
+use crate::db::connection;
+use crate::db::schema::bookmarks;
 
 use diesel::{RunQueryDsl, SelectableHelper};
 use rocket::serde::json::Json;
 
 #[post("/bookmark", format = "application/json", data = "<bookmark>")]
-fn create_bookmark(bookmark: Json<NewBookmark>) -> Json<Bookmark> {
+pub fn create_bookmark(bookmark: Json<NewBookmark>) -> Json<Bookmark> {
     let mut conn = connection::establish();
 
     let m = diesel::insert_into(bookmarks::table)
@@ -21,9 +18,8 @@ fn create_bookmark(bookmark: Json<NewBookmark>) -> Json<Bookmark> {
     Json(m)
 }
 
-#[launch]
-fn rocket() -> _ {
-    rocket::build().mount("/", routes![create_bookmark])
+pub fn routes() -> Vec<rocket::Route> {
+    routes![create_bookmark]
 }
 
 #[cfg(test)]
@@ -34,7 +30,8 @@ mod test {
 
     #[test]
     fn create_bookmark() {
-        let client = Client::tracked(rocket()).expect("valid rocket instance");
+        let app = rocket::build().mount("/", routes());
+        let client = Client::tracked(app).expect("valid rocket instance");
         let payload = NewBookmark {
             url: "https://www.rust-lang.org".to_string(),
             title: "Rust".to_string(),
