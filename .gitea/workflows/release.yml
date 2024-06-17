@@ -53,5 +53,5 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Build image
         run: |
-          docker build -t ${{ secrets.DOCKER_REGISTRY }}/${{ gitea.REPOSITORY_OWNER }}/${{ gitea.REPOSITORY }}:${{ gitea.REF_NAME }} .
-          docker push ${{ secrets.DOCKER_REGISTRY }}/${{ gitea.REPOSITORY_OWNER }}/${{ gitea.REPOSITORY }}:${{ gitea.REF_NAME }}
+          docker build -t ${{ secrets.DOCKER_REGISTRY }}/${{ gitea.REPOSITORY }}:${{ gitea.REF_NAME }} .
+          docker push ${{ secrets.DOCKER_REGISTRY }}/${{ gitea.REPOSITORY }}:${{ gitea.REF_NAME }}
