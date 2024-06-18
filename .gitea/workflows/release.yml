@@ -15,10 +15,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Sccache Action
-        uses: Mozilla-Actions/sccache-action@v0.0.4
+      - name: cargo-install sccache
+        uses: baptiste0928/cargo-install@v3.1.0
         with:
-          version: v0.8.1
+          crate: sccache
+        env:
+          RUSTC_WRAPPER: ""
       - name: Setup Sccache
         run: |
           mkdir -p ~/.aws/
