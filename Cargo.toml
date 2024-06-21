@@ -10,6 +10,7 @@ rocket = { version = "0.5.1", features = ["json"] }
 
 # database
 diesel = { version = "2.2.0", features = ["postgres", "time"] }
+diesel_migrations = { version = "2.2.0", features = ["postgres"] }
 openssl-sys = { version = "0.9.102", features = [
 	"vendored",
 ] } # static linking required
