@@ -69,40 +69,42 @@ mod test {
 
         let app = rocket::build().mount("/", routes());
         let client = Client::tracked(app).expect("valid rocket instance");
+        let mut results: Vec<Bookmark>;
 
-        let response = client.get("/").dispatch();
-        assert_eq!(response.status(), Status::Ok);
-        let results: Vec<Bookmark> = response.into_json().unwrap();
-        assert!(
+        macro_rules! assert_get_bookmarks {
+            ($uri:expr, $($assert_args:expr),*) => {
+                let response = client.get($uri).dispatch();
+                assert_eq!(response.status(), Status::Ok);
+                results = response.into_json().unwrap();
+                assert!(
+                    $($assert_args,)*
+                );
+            };
+        }
+
+        assert_get_bookmarks!(
+            "/",
             results.len() >= 5,
             "Expected more than 5 bookmarks, got {}",
             results.len()
         );
 
-        let response = client.get("/?title=Weather").dispatch();
-        assert_eq!(response.status(), Status::Ok);
-        let results: Vec<Bookmark> = response.into_json().unwrap();
-        assert!(
+        assert_get_bookmarks!(
+            "/?title=Weather",
             results.len() == 3,
             "Expected 3 bookmarks, got {}",
             results.len()
         );
 
-        let response = client.get("/?title=Weather&limit=2").dispatch();
-        assert_eq!(response.status(), Status::Ok);
-        let results: Vec<Bookmark> = response.into_json().unwrap();
-        assert!(
+        assert_get_bookmarks!(
+            "/?title=Weather&limit=2",
             results.len() == 2,
             "Expected 2 bookmarks, got {}",
             results.len()
         );
 
-        let response = client
-            .get(format!("/?title=Weather&before={}&limit=2", results[1].id))
-            .dispatch();
-        assert_eq!(response.status(), Status::Ok);
-        let results: Vec<Bookmark> = response.into_json().unwrap();
-        assert!(
+        assert_get_bookmarks!(
+            format!("/?title=Weather&before={}&limit=2", results[1].id),
             results.len() == 1,
             "Expected 1 bookmarks, got {}",
             results.len()
