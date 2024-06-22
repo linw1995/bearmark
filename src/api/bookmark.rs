@@ -31,12 +31,28 @@ pub fn search_bookmarks(
     ))
 }
 
+#[derive(Responder)]
+pub enum Error {
+    #[response(status = 404, content_type = "json")]
+    NotFound(String),
+}
+
+#[delete("/<id>")]
+pub fn delete_bookmark(id: i32) -> Result<&'static str, Error> {
+    let effected = bookmark::delete_bookmarks(vec![id]) == 1;
+    if effected {
+        Ok("Deleted")
+    } else {
+        Err(Error::NotFound("Bookmark not found".to_string()))
+    }
+}
+
 pub fn routes() -> Vec<rocket::Route> {
-    routes![create_bookmark, search_bookmarks]
+    routes![create_bookmark, search_bookmarks, delete_bookmark]
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use rocket::http::Status;
     use rocket::local::blocking::Client;
@@ -59,6 +75,28 @@ mod test {
         assert!(added.id > 0);
         assert_eq!(added.title, payload.title);
         assert_eq!(added.url, payload.url);
+    }
+
+    #[test]
+    fn delete_bookmark() {
+        let app = rocket::build().mount("/", routes());
+        let client = Client::tracked(app).expect("valid rocket instance");
+        let payload = NewBookmark {
+            url: "https://www.rust-lang.org".to_string(),
+            title: "Rust".to_string(),
+        };
+        let response = client
+            .post(uri!(super::create_bookmark))
+            .json(&payload)
+            .dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        let added: Bookmark = response.into_json().unwrap();
+
+        let response = client.delete(format!("/{}", added.id)).dispatch();
+        assert_eq!(response.status(), Status::Ok);
+
+        let response = client.delete(format!("/{}", added.id)).dispatch();
+        assert_eq!(response.status(), Status::NotFound);
     }
 
     #[test]
@@ -107,6 +145,52 @@ mod test {
             format!("/?title=Weather&before={}&limit=2", results[1].id),
             results.len() == 1,
             "Expected 1 bookmarks, got {}",
+            results.len()
+        );
+    }
+
+    #[test]
+    #[serial(unsearchable_deleted_bookmark)]
+    fn unsearchable_deleted_bookmark() {
+        let title = "invisible";
+        let app = rocket::build().mount("/", routes());
+        let client = Client::tracked(app).expect("valid rocket instance");
+        let payload = NewBookmark {
+            url: "https://www.rust-lang.org".to_string(),
+            title: title.to_string(),
+        };
+        let response = client
+            .post(uri!(super::create_bookmark))
+            .json(&payload)
+            .dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        let added: Bookmark = response.into_json().unwrap();
+
+        let mut results: Vec<Bookmark>;
+
+        macro_rules! assert_get_bookmark {
+            ($($assert_args:expr),*) => {
+                let response = client.get(format!("/?title={}", title)).dispatch();
+                assert_eq!(response.status(), Status::Ok);
+                results = response.into_json().unwrap();
+                assert!(
+                    $($assert_args,)*
+                );
+            };
+        }
+
+        assert_get_bookmark!(
+            results.len() == 1,
+            "Expected 1 bookmarks, got {}",
+            results.len()
+        );
+
+        let response = client.delete(format!("/{}", added.id)).dispatch();
+        assert_eq!(response.status(), Status::Ok);
+
+        assert_get_bookmark!(
+            results.len() == 0,
+            "Expected 0 bookmarks, got {}",
             results.len()
         );
     }

@@ -4,7 +4,7 @@ use rocket::serde::{Deserialize, Serialize};
 use super::connection;
 use super::schema::bookmarks;
 
-#[derive(Queryable, Selectable, Debug, Deserialize, Serialize)]
+#[derive(Queryable, Selectable, AsChangeset, Debug, Deserialize, Serialize)]
 #[diesel(table_name = bookmarks)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Bookmark {
@@ -12,6 +12,19 @@ pub struct Bookmark {
     pub title: String,
     pub url: String,
     pub created_at: time::OffsetDateTime,
+    pub deleted_at: Option<time::OffsetDateTime>,
+}
+
+impl Bookmark {
+    pub fn get(id: i32) -> Option<Bookmark> {
+        let mut conn = connection::establish();
+
+        bookmarks::table
+            .find(id)
+            .first(&mut conn)
+            .optional()
+            .expect("Error loading bookmark")
+    }
 }
 
 pub fn search_bookmarks(title: &str, before: i32, limit: i64) -> Vec<Bookmark> {
@@ -20,7 +33,9 @@ pub fn search_bookmarks(title: &str, before: i32, limit: i64) -> Vec<Bookmark> {
 
     let mut conn = connection::establish();
 
-    let mut query = bookmarks::table.into_boxed();
+    let mut query = bookmarks::table
+        .filter(bookmarks::dsl::deleted_at.is_null())
+        .into_boxed();
 
     if !title.is_empty() {
         query = query.filter(bookmarks::dsl::title.like(format!("%{}%", title)))
@@ -35,6 +50,30 @@ pub fn search_bookmarks(title: &str, before: i32, limit: i64) -> Vec<Bookmark> {
         .limit(limit)
         .load::<Bookmark>(&mut conn)
         .expect("Error search bookmarks")
+}
+
+pub fn create_bookmark(new_bookmark: NewBookmark) -> Bookmark {
+    let mut conn = connection::establish();
+
+    diesel::insert_into(bookmarks::table)
+        .values(&new_bookmark)
+        .returning(Bookmark::as_returning())
+        .get_result(&mut conn)
+        .expect("Error saving new bookmark")
+}
+
+pub fn delete_bookmarks(ids: Vec<i32>) -> usize {
+    use diesel::{dsl::now, ExpressionMethods};
+
+    use super::schema::bookmarks::{dsl::*, table};
+
+    let mut conn = connection::establish();
+
+    diesel::update(table)
+        .filter(id.eq_any(ids).and(deleted_at.is_null()))
+        .set(deleted_at.eq(now))
+        .execute(&mut conn)
+        .expect("Error deleting bookmarks")
 }
 
 #[derive(Insertable, Debug, Deserialize, Serialize)]
@@ -58,19 +97,13 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn create_bookmark() {
-        let mut conn = connection::establish();
-
+    fn create_new_bookmark() {
         let new_bookmark = NewBookmark {
             title: "test".to_string(),
             url: "https://example.com".to_string(),
         };
 
-        let m = diesel::insert_into(bookmarks::table)
-            .values(&new_bookmark)
-            .returning(Bookmark::as_returning())
-            .get_result(&mut conn)
-            .expect("Error saving new bookmark");
+        let m = create_bookmark(new_bookmark);
 
         info!("{:?}", m);
         assert!(m.id > 0);
@@ -78,7 +111,7 @@ pub(crate) mod tests {
 
     #[test]
     fn title_search_bookmark() {
-        create_bookmark();
+        create_new_bookmark();
 
         let mut conn = connection::establish();
 
@@ -90,6 +123,23 @@ pub(crate) mod tests {
 
         assert!(results.len() > 0);
         info!("{:?}", results[0]);
+    }
+
+    #[test]
+    pub fn delete_a_bookmark() {
+        let new_bookmark = NewBookmark {
+            title: "test".to_string(),
+            url: "https://example.com".to_string(),
+        };
+        let m = create_bookmark(new_bookmark);
+        assert!(m.id > 0);
+        assert!(m.deleted_at.is_none());
+
+        let count = delete_bookmarks(vec![m.id]);
+        assert!(count == 1);
+
+        let m = Bookmark::get(m.id).unwrap();
+        assert!(m.deleted_at.is_some());
     }
 
     #[test]
@@ -152,5 +202,27 @@ pub(crate) mod tests {
             "Expected 1 bookmarks, got {}",
             results.len()
         );
+    }
+
+    #[test]
+    #[serial(unsearchable_deleted_bookmark)]
+    fn unsearchable_deleted_bookmark() {
+        let title = "invisible";
+        let new_bookmark = NewBookmark {
+            title: title.to_string(),
+            url: "https://example.com".to_string(),
+        };
+        let m = create_bookmark(new_bookmark);
+        assert!(m.id > 0);
+        assert!(m.deleted_at.is_none());
+
+        let result = search_bookmarks(title, 0, 1);
+        assert!(result.len() == 1);
+
+        let count = delete_bookmarks(vec![m.id]);
+        assert!(count == 1);
+
+        let result = search_bookmarks(title, 0, 1);
+        assert!(result.len() == 0);
     }
 }

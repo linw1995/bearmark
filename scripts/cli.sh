@@ -35,7 +35,9 @@ main() {
 	export LIBRARY_PATH=${LIBRARY_PATH-}:/opt/homebrew/opt/libpq/lib/
 
 	action=${1-}
-	shift 1
+
+	# shift if length of arguments is greater than 0
+	[[ $# -gt 0 ]] && shift 1
 
 	case $action in
 	"" | "-h" | "--help")
