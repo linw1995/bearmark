@@ -11,7 +11,9 @@ pub struct Bookmark {
     pub id: i32,
     pub title: String,
     pub url: String,
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: time::OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
     pub deleted_at: Option<time::OffsetDateTime>,
 }
 
