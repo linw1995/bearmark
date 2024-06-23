@@ -33,7 +33,7 @@ pub fn search_bookmarks(
 
 #[derive(Responder)]
 pub enum Error {
-    #[response(status = 404, content_type = "json")]
+    #[response(status = 404)]
     NotFound(String),
 }
 
