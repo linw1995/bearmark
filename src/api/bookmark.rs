@@ -1,19 +1,21 @@
+use super::fairings::db::Db;
 use crate::db::bookmark::{self, Bookmark, NewBookmark};
-use crate::db::connection;
 use crate::db::schema::bookmarks;
 
 use diesel::SelectableHelper;
 use diesel_async::RunQueryDsl;
 use rocket::serde::json::Json;
+use rocket_db_pools::Connection;
 
 #[post("/", format = "application/json", data = "<bookmark>")]
-pub async fn create_bookmark(bookmark: Json<NewBookmark>) -> Json<Bookmark> {
-    let mut conn = connection::establish().await;
-
+pub async fn create_bookmark(
+    mut db: Connection<Db>,
+    bookmark: Json<NewBookmark>,
+) -> Json<Bookmark> {
     let m = diesel::insert_into(bookmarks::table)
         .values(&bookmark.into_inner())
         .returning(Bookmark::as_returning())
-        .get_result(&mut conn)
+        .get_result(&mut db)
         .await
         .expect("Error saving new bookmark");
 
@@ -22,12 +24,14 @@ pub async fn create_bookmark(bookmark: Json<NewBookmark>) -> Json<Bookmark> {
 
 #[get("/?<title>&<before>&<limit>")]
 pub async fn search_bookmarks(
+    mut db: Connection<Db>,
     title: Option<&str>,
     before: Option<i32>,
     limit: Option<i64>,
 ) -> Json<Vec<Bookmark>> {
     Json(
         bookmark::search_bookmarks(
+            &mut db,
             title.unwrap_or_default(),
             before.unwrap_or_default(),
             limit.unwrap_or(10),
@@ -43,8 +47,8 @@ pub enum Error {
 }
 
 #[delete("/<id>")]
-pub async fn delete_bookmark(id: i32) -> Result<&'static str, Error> {
-    let effected = bookmark::delete_bookmarks(vec![id]).await == 1;
+pub async fn delete_bookmark(mut db: Connection<Db>, id: i32) -> Result<&'static str, Error> {
+    let effected = bookmark::delete_bookmarks(&mut db, vec![id]).await == 1;
     if effected {
         Ok("Deleted")
     } else {
@@ -62,11 +66,12 @@ mod tests {
 
     use rocket::http::Status;
     use rocket::local::blocking::Client;
+    use rocket_db_pools::Database;
     use tracing::info;
 
     #[test]
     fn create_bookmark() {
-        let app = rocket::build().mount("/", routes());
+        let app = rocket::build().attach(Db::init()).mount("/", routes());
         let client = Client::tracked(app).expect("valid rocket instance");
         let payload = NewBookmark {
             url: "https://www.rust-lang.org".to_string(),
@@ -85,8 +90,9 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn delete_bookmark() {
-        let app = rocket::build().mount("/", routes());
+        let app = rocket::build().attach(Db::init()).mount("/", routes());
         let client = Client::tracked(app).expect("valid rocket instance");
         let payload = NewBookmark {
             url: "https://www.rust-lang.org".to_string(),
@@ -112,7 +118,7 @@ mod tests {
         // Create some bookmarks
         crate::db::bookmark::tests::search_bookmarks_with_pagination();
 
-        let app = rocket::build().mount("/", routes());
+        let app = rocket::build().attach(Db::init()).mount("/", routes());
         let client = Client::tracked(app).expect("valid rocket instance");
         let mut results: Vec<Bookmark>;
 
@@ -161,7 +167,7 @@ mod tests {
         let payload = crate::db::bookmark::tests::rand_bookmark();
         info!(?payload, "creating");
         let title = payload.title.clone();
-        let app = rocket::build().mount("/", routes());
+        let app = rocket::build().attach(Db::init()).mount("/", routes());
         let client = Client::tracked(app).expect("valid rocket instance");
         let response = client
             .post(uri!(super::create_bookmark))
