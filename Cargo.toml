@@ -10,6 +10,7 @@ rocket = { version = "0.5.1", features = ["json"] }
 
 # database
 diesel = { version = "2.2.0", features = ["postgres", "time"] }
+diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "74867bd68e3b600709911b5854a598cbec2ae4a3", version = "0.4.1", features = ["async-connection-wrapper", "postgres"] }
 diesel_migrations = { version = "2.2.0", features = ["postgres"] }
 openssl-sys = { version = "0.9.102", features = [
 	"vendored",
@@ -19,14 +20,17 @@ pq-sys = { version = "0.6.1", features = ["bundled"] } # static linking required
 ##################
 # other utilities
 ##################
+rand = "0.8.5"
 serde = { version = "1.0.203", features = ["derive"] }
 time = { version = "0.3.36", features = ["local-offset", "macros", "serde"] }
-# read settings from envorionment variables
+# read settings from the dotenv file
 dotenvy = "0.15.7"
 # logging
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
-tracing-subscriber = { version = "0.3.18", features = ["json", "local-time"] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+# async runtime
+tokio = { version = "1.38.0", features = ["rt", "macros", "sync"] }
 
 [dev-dependencies]
 # setup for tests

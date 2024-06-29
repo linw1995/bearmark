@@ -2,33 +2,38 @@ use crate::db::bookmark::{self, Bookmark, NewBookmark};
 use crate::db::connection;
 use crate::db::schema::bookmarks;
 
-use diesel::{RunQueryDsl, SelectableHelper};
+use diesel::SelectableHelper;
+use diesel_async::RunQueryDsl;
 use rocket::serde::json::Json;
 
 #[post("/", format = "application/json", data = "<bookmark>")]
-pub fn create_bookmark(bookmark: Json<NewBookmark>) -> Json<Bookmark> {
-    let mut conn = connection::establish();
+pub async fn create_bookmark(bookmark: Json<NewBookmark>) -> Json<Bookmark> {
+    let mut conn = connection::establish().await;
 
     let m = diesel::insert_into(bookmarks::table)
         .values(&bookmark.into_inner())
         .returning(Bookmark::as_returning())
         .get_result(&mut conn)
+        .await
         .expect("Error saving new bookmark");
 
     Json(m)
 }
 
 #[get("/?<title>&<before>&<limit>")]
-pub fn search_bookmarks(
+pub async fn search_bookmarks(
     title: Option<&str>,
     before: Option<i32>,
     limit: Option<i64>,
 ) -> Json<Vec<Bookmark>> {
-    Json(bookmark::search_bookmarks(
-        title.unwrap_or_default(),
-        before.unwrap_or_default(),
-        limit.unwrap_or(10),
-    ))
+    Json(
+        bookmark::search_bookmarks(
+            title.unwrap_or_default(),
+            before.unwrap_or_default(),
+            limit.unwrap_or(10),
+        )
+        .await,
+    )
 }
 
 #[derive(Responder)]
@@ -38,8 +43,8 @@ pub enum Error {
 }
 
 #[delete("/<id>")]
-pub fn delete_bookmark(id: i32) -> Result<&'static str, Error> {
-    let effected = bookmark::delete_bookmarks(vec![id]) == 1;
+pub async fn delete_bookmark(id: i32) -> Result<&'static str, Error> {
+    let effected = bookmark::delete_bookmarks(vec![id]).await == 1;
     if effected {
         Ok("Deleted")
     } else {
@@ -54,8 +59,10 @@ pub fn routes() -> Vec<rocket::Route> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use rocket::http::Status;
     use rocket::local::blocking::Client;
+    use tracing::info;
 
     #[test]
     fn create_bookmark() {
@@ -100,7 +107,7 @@ mod tests {
     }
 
     #[test]
-    #[serial(search_bookmarks)]
+    #[serial] // For reusing another test setup.
     fn search_bookmarks() {
         // Create some bookmarks
         crate::db::bookmark::tests::search_bookmarks_with_pagination();
@@ -150,21 +157,19 @@ mod tests {
     }
 
     #[test]
-    #[serial(unsearchable_deleted_bookmark)]
     fn unsearchable_deleted_bookmark() {
-        let title = "invisible";
+        let payload = crate::db::bookmark::tests::rand_bookmark();
+        info!(?payload, "creating");
+        let title = payload.title.clone();
         let app = rocket::build().mount("/", routes());
         let client = Client::tracked(app).expect("valid rocket instance");
-        let payload = NewBookmark {
-            url: "https://www.rust-lang.org".to_string(),
-            title: title.to_string(),
-        };
         let response = client
             .post(uri!(super::create_bookmark))
             .json(&payload)
             .dispatch();
         assert_eq!(response.status(), Status::Ok);
         let added: Bookmark = response.into_json().unwrap();
+        info!(?added, "created");
 
         let mut results: Vec<Bookmark>;
 
