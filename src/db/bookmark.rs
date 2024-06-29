@@ -1,8 +1,7 @@
 use diesel::prelude::*;
-use diesel_async::RunQueryDsl;
+use diesel_async::{AsyncPgConnection as Connection, RunQueryDsl};
 use rocket::serde::{Deserialize, Serialize};
 
-use super::connection::Connection;
 use super::schema::bookmarks;
 
 #[derive(Queryable, Selectable, AsChangeset, Debug, Deserialize, Serialize)]
@@ -112,7 +111,7 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn create_new_bookmark() {
         let new_bookmark = rand_bookmark();
-        let mut conn = connection::establish().await;
+        let mut conn = connection::establish_async().await;
 
         let m = create_bookmark(&mut conn, new_bookmark).await;
 
@@ -122,7 +121,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn title_search_bookmark() {
-        let mut conn = connection::establish().await;
+        let mut conn = connection::establish_async().await;
         let new_bookmark = rand_bookmark();
         let title = new_bookmark.title.clone();
         create_bookmark(&mut conn, new_bookmark).await;
@@ -140,7 +139,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     pub async fn delete_a_bookmark() {
-        let mut conn = connection::establish().await;
+        let mut conn = connection::establish_async().await;
         let new_bookmark = rand_bookmark();
         let m = create_bookmark(&mut conn, new_bookmark).await;
         assert!(m.id > 0);
@@ -156,7 +155,7 @@ pub(crate) mod tests {
     #[tokio::test]
     #[serial] // For allowing remove all data of table in test
     pub async fn search_bookmarks_with_pagination() {
-        let mut conn = connection::establish().await;
+        let mut conn = connection::establish_async().await;
         clean_bookmarks(&mut conn).await;
 
         let values = vec![
@@ -184,7 +183,7 @@ pub(crate) mod tests {
 
         diesel::insert_into(bookmarks::table)
             .values(&values)
-            .execute(&mut connection::establish().await)
+            .execute(&mut connection::establish_async().await)
             .await
             .expect("Error saving new bookmarks");
 
@@ -220,7 +219,7 @@ pub(crate) mod tests {
     #[tokio::test]
     #[serial]
     async fn unsearchable_deleted_bookmark() {
-        let mut conn = connection::establish().await;
+        let mut conn = connection::establish_async().await;
         let new_bookmark = rand_bookmark();
         let title = new_bookmark.title.clone();
         let m = create_bookmark(&mut conn, new_bookmark).await;
