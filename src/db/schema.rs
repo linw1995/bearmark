@@ -7,5 +7,6 @@ diesel::table! {
         url -> Varchar,
         created_at -> Timestamptz,
         deleted_at -> Nullable<Timestamptz>,
+        updated_at -> Timestamptz,
     }
 }

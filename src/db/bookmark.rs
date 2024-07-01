@@ -15,6 +15,24 @@ pub struct Bookmark {
     pub created_at: time::OffsetDateTime,
     #[serde(with = "time::serde::rfc3339::option")]
     pub deleted_at: Option<time::OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_at: time::OffsetDateTime,
+}
+
+#[derive(Insertable, AsChangeset, Deserialize, Serialize, Debug, Clone)]
+#[serde(crate = "rocket::serde")]
+#[diesel(table_name = bookmarks)]
+pub struct NewBookmark {
+    pub title: String,
+    pub url: String,
+}
+
+#[derive(AsChangeset, Deserialize, Serialize, Debug)]
+#[serde(crate = "rocket::serde")]
+#[diesel(table_name = bookmarks)]
+pub struct ModifyBookmark {
+    pub title: Option<String>,
+    pub url: Option<String>,
 }
 
 impl Bookmark {
@@ -66,6 +84,16 @@ pub async fn create_bookmark(conn: &mut Connection, new_bookmark: NewBookmark) -
         .expect("Error saving new bookmark")
 }
 
+pub async fn update_bookmark(conn: &mut Connection, id: i32, modified: ModifyBookmark) -> Bookmark {
+    use diesel::{dsl::now, ExpressionMethods};
+    diesel::update(bookmarks::table.find(id))
+        .set((&modified, bookmarks::updated_at.eq(now)))
+        .returning(Bookmark::as_returning())
+        .get_result(conn)
+        .await
+        .expect("Error updating bookmark")
+}
+
 pub async fn delete_bookmarks(conn: &mut Connection, ids: Vec<i32>) -> usize {
     use diesel::{dsl::now, ExpressionMethods};
 
@@ -73,18 +101,10 @@ pub async fn delete_bookmarks(conn: &mut Connection, ids: Vec<i32>) -> usize {
 
     diesel::update(table)
         .filter(id.eq_any(ids).and(deleted_at.is_null()))
-        .set(deleted_at.eq(now))
+        .set((deleted_at.eq(now), updated_at.eq(now)))
         .execute(conn)
         .await
         .expect("Error deleting bookmarks")
-}
-
-#[derive(Insertable, Debug, Deserialize, Serialize)]
-#[serde(crate = "rocket::serde")]
-#[diesel(table_name = bookmarks)]
-pub struct NewBookmark {
-    pub title: String,
-    pub url: String,
 }
 
 #[cfg(test)]
@@ -97,7 +117,7 @@ pub(crate) mod tests {
     pub fn rand_bookmark() -> NewBookmark {
         NewBookmark {
             title: utils::rand::rand_str(10),
-            url: "https://example.com".to_string(),
+            url: format!("https://{}.com", utils::rand::rand_str(10)).to_string(),
         }
     }
 
@@ -237,5 +257,33 @@ pub(crate) mod tests {
         let result = search_bookmarks(&mut conn, &title, 0, 1).await;
         info!(?result, "searched");
         assert!(result.len() == 0);
+    }
+
+    #[tokio::test]
+    async fn update_exists_bookmark() {
+        let mut conn = connection::establish_async().await;
+        let new = rand_bookmark();
+        let bm = create_bookmark(&mut conn, new.clone()).await;
+        assert!(bm.id > 0);
+        assert_eq!(bm.title, new.title);
+        assert_eq!(bm.url, new.url);
+
+        let modified = rand_bookmark();
+
+        assert_ne!(new.title, modified.title);
+        assert_ne!(new.url, modified.url);
+
+        let modified_bm = update_bookmark(
+            &mut conn,
+            bm.id,
+            ModifyBookmark {
+                title: Some(modified.title.clone()),
+                url: Some(modified.url.clone()),
+            },
+        )
+        .await;
+        assert_eq!(modified_bm.id, bm.id);
+        assert_eq!(modified_bm.title, modified.title);
+        assert_eq!(modified_bm.url, modified.url);
     }
 }
