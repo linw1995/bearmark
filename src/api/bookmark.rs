@@ -1,5 +1,5 @@
 use super::fairings::db::Db;
-use crate::db::bookmark::{self, Bookmark, NewBookmark};
+use crate::db::bookmark::{self, Bookmark, ModifyBookmark, NewBookmark};
 
 use rocket::serde::json::Json;
 use rocket_db_pools::Connection;
@@ -44,14 +44,30 @@ pub async fn delete_bookmark(mut db: Connection<Db>, id: i32) -> Result<&'static
     }
 }
 
+#[put("/<id>", format = "application/json", data = "<payload>")]
+pub async fn update_bookmark(
+    mut db: Connection<Db>,
+    id: i32,
+    payload: Json<ModifyBookmark>,
+) -> Json<Bookmark> {
+    let m = bookmark::update_bookmark(&mut db, id, payload.into_inner()).await;
+    Json(m)
+}
+
 pub fn routes() -> Vec<rocket::Route> {
-    routes![create_bookmark, search_bookmarks, delete_bookmark]
+    routes![
+        create_bookmark,
+        search_bookmarks,
+        delete_bookmark,
+        update_bookmark
+    ]
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use bookmark::tests::rand_bookmark;
     use rocket::http::Status;
     use rocket::local::blocking::Client;
     use rocket_db_pools::Database;
@@ -192,5 +208,36 @@ mod tests {
             "Expected 0 bookmarks, got {}",
             results.len()
         );
+    }
+
+    #[test]
+    fn update_exist_bookmark() {
+        let app = rocket::build().attach(Db::init()).mount("/", routes());
+        let client = Client::tracked(app).expect("valid rocket instance");
+        let payload = rand_bookmark();
+        let response = client
+            .post(uri!(super::create_bookmark))
+            .json(&payload)
+            .dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        let added: Bookmark = response.into_json().unwrap();
+
+        let payload = ModifyBookmark {
+            url: Some("https://www.rust-lang.org".to_string()),
+            title: Some("Rust Programming Language".to_string()),
+        };
+        assert_ne!(Some(added.title), payload.title);
+        assert_ne!(Some(added.url), payload.url);
+
+        let response = client
+            .put(format!("/{}", added.id))
+            .json(&payload)
+            .dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        let updated: Bookmark = response.into_json().unwrap();
+
+        assert_eq!(updated.id, added.id);
+        assert_eq!(updated.title, payload.title.unwrap());
+        assert_eq!(updated.url, payload.url.unwrap());
     }
 }
