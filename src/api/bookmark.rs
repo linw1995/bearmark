@@ -1,24 +1,12 @@
 use super::fairings::db::Db;
 use crate::db::bookmark::{self, Bookmark, NewBookmark};
-use crate::db::schema::bookmarks;
 
-use diesel::SelectableHelper;
-use diesel_async::RunQueryDsl;
 use rocket::serde::json::Json;
 use rocket_db_pools::Connection;
 
-#[post("/", format = "application/json", data = "<bookmark>")]
-pub async fn create_bookmark(
-    mut db: Connection<Db>,
-    bookmark: Json<NewBookmark>,
-) -> Json<Bookmark> {
-    let m = diesel::insert_into(bookmarks::table)
-        .values(&bookmark.into_inner())
-        .returning(Bookmark::as_returning())
-        .get_result(&mut db)
-        .await
-        .expect("Error saving new bookmark");
-
+#[post("/", format = "application/json", data = "<payload>")]
+pub async fn create_bookmark(mut db: Connection<Db>, payload: Json<NewBookmark>) -> Json<Bookmark> {
+    let m = bookmark::create_bookmark(&mut db, payload.into_inner()).await;
     Json(m)
 }
 
