@@ -60,7 +60,7 @@ pub async fn search_bookmarks(
         .into_boxed();
 
     if !title.is_empty() {
-        query = query.filter(bookmarks::dsl::title.like(format!("%{}%", title)))
+        query = query.filter(bookmarks::dsl::title.ilike(format!("%{}%", title)))
     }
 
     if before > 0 {
