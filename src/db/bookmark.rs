@@ -84,13 +84,18 @@ pub async fn create_bookmark(conn: &mut Connection, new_bookmark: NewBookmark) -
         .expect("Error saving new bookmark")
 }
 
-pub async fn update_bookmark(conn: &mut Connection, id: i32, modified: ModifyBookmark) -> Bookmark {
+pub async fn update_bookmark(
+    conn: &mut Connection,
+    id: i32,
+    modified: ModifyBookmark,
+) -> Option<Bookmark> {
     use diesel::{dsl::now, ExpressionMethods};
     diesel::update(bookmarks::table.find(id))
         .set((&modified, bookmarks::updated_at.eq(now)))
         .returning(Bookmark::as_returning())
         .get_result(conn)
         .await
+        .optional()
         .expect("Error updating bookmark")
 }
 
@@ -273,7 +278,7 @@ pub(crate) mod tests {
         assert_ne!(new.title, modified.title);
         assert_ne!(new.url, modified.url);
 
-        let modified_bm = update_bookmark(
+        let rv = update_bookmark(
             &mut conn,
             bm.id,
             ModifyBookmark {
@@ -282,6 +287,8 @@ pub(crate) mod tests {
             },
         )
         .await;
+        assert!(rv.is_some());
+        let modified_bm = rv.unwrap();
         assert_eq!(modified_bm.id, bm.id);
         assert_eq!(modified_bm.title, modified.title);
         assert_eq!(modified_bm.url, modified.url);

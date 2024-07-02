@@ -49,9 +49,11 @@ pub async fn update_bookmark(
     mut db: Connection<Db>,
     id: i32,
     payload: Json<ModifyBookmark>,
-) -> Json<Bookmark> {
-    let m = bookmark::update_bookmark(&mut db, id, payload.into_inner()).await;
-    Json(m)
+) -> Result<Json<Bookmark>, Error> {
+    bookmark::update_bookmark(&mut db, id, payload.into_inner())
+        .await
+        .map(|b| Json(b))
+        .ok_or_else(|| Error::NotFound("Bookmark not found".to_string()))
 }
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -239,5 +241,18 @@ mod tests {
         assert_eq!(updated.id, added.id);
         assert_eq!(updated.title, payload.title.unwrap());
         assert_eq!(updated.url, payload.url.unwrap());
+    }
+
+    #[test]
+    fn update_missing_bookmark() {
+        let app = rocket::build().attach(Db::init()).mount("/", routes());
+        let client = Client::tracked(app).expect("valid rocket instance");
+        let payload = ModifyBookmark {
+            url: Some("https://www.rust-lang.org".to_string()),
+            title: Some("Rust Programming Language".to_string()),
+        };
+
+        let response = client.put("/99999999").json(&payload).dispatch();
+        assert_eq!(response.status(), Status::NotFound);
     }
 }
