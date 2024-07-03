@@ -4,7 +4,9 @@ use rocket::serde::{Deserialize, Serialize};
 
 use super::schema::bookmarks;
 
-#[derive(Queryable, Selectable, AsChangeset, Debug, Deserialize, Serialize)]
+#[derive(
+    Queryable, Selectable, Identifiable, AsChangeset, Deserialize, Serialize, Debug, Clone,
+)]
 #[diesel(table_name = bookmarks)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Bookmark {
