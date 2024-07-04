@@ -1,0 +1,87 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  CI:
+
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: postgres:12
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: example
+          POSTGRES_DB: bmm
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt install -yq \
+          build-essential \
+          musl-dev \
+          musl-tools
+    - uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        target: x86_64-unknown-linux-musl
+
+    - name: Run sccache-cache
+      uses: mozilla-actions/sccache-action@v0.0.5
+    - name: cargo-install cargo-tarpaulin
+      uses: baptiste0928/cargo-install@v3.1.0
+      with:
+        crate: cargo-tarpaulin
+    - name: cargo-install diesel_cli
+      uses: baptiste0928/cargo-install@v3.1.0
+      with:
+        crate: diesel_cli
+        features: postgres
+    - name: Setup
+      run: |
+        ./scripts/cli.sh setup
+      env:
+        POSTGRES_HOST: localhost
+        POSTGRES_PORT: 5432
+
+    - name: Run lints
+      run: |
+        ./scripts/cli.sh lint
+      env:
+        CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
+        SCCACHE_GHA_ENABLED: "true"
+        RUSTC_WRAPPER: "sccache"
+
+    - name: Run tests with coverage
+      run: |
+        ./scripts/cli.sh coverage      
+      env:
+        CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
+        SCCACHE_GHA_ENABLED: "true"
+        RUSTC_WRAPPER: "sccache"
+
+    - name: Try to build release
+      continue-on-error: true
+      run: |
+        cargo build --bin serve --release --verbose
+        find . -name serve -type f
+      env:
+        CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
+        SCCACHE_GHA_ENABLED: "true"
+        RUSTC_WRAPPER: "sccache"

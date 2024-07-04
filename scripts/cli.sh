@@ -55,7 +55,7 @@ main() {
 			echo "DATABASE_URL=postgres://postgres:example@localhost:5432/bmm" >.env
 		else
 			echo ">>> Skip setting up the project development environment"
-			echo "DATABASE_URL=postgres://postgres:example@db:5432/bmm" >.env
+			echo "DATABASE_URL=postgres://postgres:example@${POSTGRES_HOST-db}:${POSTGRES_PORT-5432}/bmm" >.env
 		fi
 		echo ">>> Setting up database"
 		diesel migration run
