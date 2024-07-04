@@ -52,7 +52,7 @@ pub async fn update_bookmark(
 ) -> Result<Json<Bookmark>, Error> {
     bookmark::update_bookmark(&mut db, id, payload.into_inner())
         .await
-        .map(|b| Json(b))
+        .map(Json)
         .ok_or_else(|| Error::NotFound("Bookmark not found".to_string()))
 }
 

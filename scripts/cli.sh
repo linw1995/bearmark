@@ -46,7 +46,7 @@ main() {
 		;;
 	"lint")
 		echo ">>> Running clippy"
-		cargo clippy --all-features
+		cargo clippy --all-features "$@"
 		;;
 	"setup")
 		if [[ -z "${CI-}" ]]; then

@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection as Connection, RunQueryDsl};
 use rocket::serde::{Deserialize, Serialize};
 
-use super::bookmark::{self, Bookmark};
+use super::bookmark::Bookmark;
 use super::schema::{bookmarks_tags, tags};
 
 #[derive(Queryable, Selectable, Identifiable, Debug, Deserialize, Serialize)]
@@ -33,7 +33,7 @@ pub struct NewTag {
     pub name: String,
 }
 
-async fn get_tags(conn: &mut Connection, tags: Vec<&str>) -> Vec<Tag> {
+pub async fn get_tags(conn: &mut Connection, tags: Vec<&str>) -> Vec<Tag> {
     tags::table
         .filter(tags::name.eq_any(tags))
         .load(conn)
@@ -41,7 +41,7 @@ async fn get_tags(conn: &mut Connection, tags: Vec<&str>) -> Vec<Tag> {
         .expect("Error loading tags")
 }
 
-async fn get_or_create_tags(conn: &mut Connection, tags: Vec<&str>) -> Vec<Tag> {
+pub async fn get_or_create_tags(conn: &mut Connection, tags: Vec<&str>) -> Vec<Tag> {
     use diesel::{dsl::now, ExpressionMethods};
     let tags = tags
         .iter()
@@ -61,7 +61,7 @@ async fn get_or_create_tags(conn: &mut Connection, tags: Vec<&str>) -> Vec<Tag> 
         .expect("Error creating tags")
 }
 
-async fn update_bookmark_tags(conn: &mut Connection, bookmark: &Bookmark, tags: Vec<&str>) {
+pub async fn update_bookmark_tags(conn: &mut Connection, bookmark: &Bookmark, tags: Vec<&str>) {
     let tags = get_or_create_tags(conn, tags).await;
     let bookmark_tags = tags
         .into_iter()
@@ -83,7 +83,7 @@ async fn update_bookmark_tags(conn: &mut Connection, bookmark: &Bookmark, tags: 
         .expect("Error updating bookmark tags");
 }
 
-async fn get_tags_per_bookmark(
+pub async fn get_tags_per_bookmark(
     conn: &mut Connection,
     bookmarks: Vec<Bookmark>,
 ) -> Vec<(Bookmark, Vec<Tag>)> {
@@ -102,12 +102,10 @@ async fn get_tags_per_bookmark(
 
 #[cfg(test)]
 mod tests {
-    use bookmark::tests::rand_bookmark;
-
-    use crate::utils::rand::rand_str;
-
+    use super::super::bookmark::{self, tests::rand_bookmark};
     use super::super::connection;
     use super::*;
+    use crate::utils::rand::rand_str;
 
     #[tokio::test]
     async fn test_get_or_create_tags() {
