@@ -76,12 +76,12 @@ jobs:
         SCCACHE_GHA_ENABLED: "true"
         RUSTC_WRAPPER: "sccache"
 
-    - name: Try to build release
-      continue-on-error: true
-      run: |
-        cargo build --bin serve --release --verbose
-        find . -name serve -type f
-      env:
-        CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
-        SCCACHE_GHA_ENABLED: "true"
-        RUSTC_WRAPPER: "sccache"
+    # - name: Try to build release
+    #   continue-on-error: true
+    #   run: |
+    #     cargo build --bin serve --release --verbose
+    #     find . -name serve -type f
+    #   env:
+    #     CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
+    #     SCCACHE_GHA_ENABLED: "true"
+    #     RUSTC_WRAPPER: "sccache"
