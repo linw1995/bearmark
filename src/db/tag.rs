@@ -78,6 +78,7 @@ pub async fn update_bookmark_tags(conn: &mut Connection, bookmark: &Bookmark, ta
 
     diesel::insert_into(bookmarks_tags::table)
         .values(&bookmark_tags)
+        .on_conflict_do_nothing()
         .execute(conn)
         .await
         .expect("Error updating bookmark tags");

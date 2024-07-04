@@ -96,7 +96,6 @@ mod tests {
     }
 
     #[test]
-    #[serial]
     fn delete_bookmark() {
         let app = rocket::build().attach(Db::init()).mount("/", routes());
         let client = Client::tracked(app).expect("valid rocket instance");
@@ -118,21 +117,24 @@ mod tests {
         assert_eq!(response.status(), Status::NotFound);
     }
 
-    #[test]
-    #[serial] // For reusing another test setup.
-    fn search_bookmarks() {
+    #[rocket::async_test]
+    #[file_serial] // For reusing another test setup.
+    async fn search_bookmarks() {
+        use rocket::local::asynchronous::Client;
+
         // Create some bookmarks
-        crate::db::bookmark::tests::search_bookmarks_with_pagination();
+        let mut conn = crate::db::connection::establish_async().await;
+        crate::db::bookmark::tests::setup_searchable_bookmarks(&mut conn).await;
 
         let app = rocket::build().attach(Db::init()).mount("/", routes());
-        let client = Client::tracked(app).expect("valid rocket instance");
+        let client = Client::tracked(app).await.expect("valid rocket instance");
         let mut results: Vec<Bookmark>;
 
         macro_rules! assert_get_bookmarks {
             ($uri:expr, $($assert_args:expr),*) => {
-                let response = client.get($uri).dispatch();
+                let response = client.get($uri).dispatch().await;
                 assert_eq!(response.status(), Status::Ok);
-                results = response.into_json().unwrap();
+                results = response.into_json().await.unwrap();
                 assert!(
                     $($assert_args,)*
                 );

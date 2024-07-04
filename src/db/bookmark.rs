@@ -128,13 +128,6 @@ pub(crate) mod tests {
         }
     }
 
-    async fn clean_bookmarks(conn: &mut Connection) {
-        diesel::delete(bookmarks::table)
-            .execute(conn)
-            .await
-            .expect("Error deleting bookmarks");
-    }
-
     #[tokio::test]
     async fn create_new_bookmark() {
         let new_bookmark = rand_bookmark();
@@ -179,12 +172,7 @@ pub(crate) mod tests {
         assert!(m.deleted_at.is_some());
     }
 
-    #[tokio::test]
-    #[serial] // For allowing remove all data of table in test
-    pub async fn search_bookmarks_with_pagination() {
-        let mut conn = connection::establish_async().await;
-        clean_bookmarks(&mut conn).await;
-
+    pub async fn setup_searchable_bookmarks(conn: &mut Connection) {
         let values = vec![
             NewBookmark {
                 title: "Weather".to_string(),
@@ -208,11 +196,29 @@ pub(crate) mod tests {
             },
         ];
 
+        // delete bookmarks with same title
+        let titles = values
+            .iter()
+            .map(|v| v.title.clone())
+            .collect::<Vec<String>>();
+        diesel::delete(bookmarks::table)
+            .filter(bookmarks::title.eq_any(titles))
+            .execute(conn)
+            .await
+            .expect("Error deleting bookmarks");
+
         diesel::insert_into(bookmarks::table)
             .values(&values)
-            .execute(&mut connection::establish_async().await)
+            .execute(conn)
             .await
             .expect("Error saving new bookmarks");
+    }
+
+    #[tokio::test]
+    #[file_serial] // For allowing remove all data of table in test
+    pub async fn search_bookmarks_with_pagination() {
+        let mut conn = connection::establish_async().await;
+        setup_searchable_bookmarks(&mut conn).await;
 
         let results = search_bookmarks(&mut conn, "", 0, 10).await;
         assert!(
@@ -244,7 +250,6 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    #[serial]
     async fn unsearchable_deleted_bookmark() {
         let mut conn = connection::establish_async().await;
         let new_bookmark = rand_bookmark();
