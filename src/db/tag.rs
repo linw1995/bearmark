@@ -1,6 +1,5 @@
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection as Connection, RunQueryDsl};
-use itertools::Itertools;
 use rocket::serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -122,7 +121,8 @@ pub async fn search_bookmarks(
         let mut query = bookmarks_tags::table
             .inner_join(bookmarks::table)
             .inner_join(schema::tags::table)
-            .select((Bookmark::as_select(), Tag::as_select()))
+            .select(Bookmark::as_select())
+            .distinct_on(bookmarks::id)
             .filter(bookmarks::dsl::deleted_at.is_null())
             .filter(schema::tags::dsl::name.eq_any(tags))
             .into_boxed();
@@ -137,15 +137,17 @@ pub async fn search_bookmarks(
 
         let bs = query
             .order_by(bookmarks::dsl::id.desc())
-            .limit(limit) // FIXME: wrong limit
-            .load::<(Bookmark, Tag)>(conn)
+            .limit(limit)
+            .load::<Bookmark>(conn)
             .await
             .expect("Error loading bookmarks");
 
-        debug!(?bs, "bookmarks with tags");
+        debug!(?bs, "bookmarks without tags");
 
         // Group bookmark and tags
-        bs.into_iter().into_group_map().into_iter().collect()
+        let bs_ts = get_tags_per_bookmark(conn, bs).await;
+        debug!(?bs_ts, "bookmarks with tags");
+        bs_ts
     }
 }
 
@@ -158,6 +160,7 @@ mod tests {
     use crate::db::schema::bookmarks;
     use crate::utils::rand::rand_str;
 
+    use itertools::Itertools;
     use tracing::info;
 
     #[tokio::test]
@@ -310,6 +313,18 @@ mod tests {
             10,
         )
         .await;
+        info!(?bookmarks, "searched bookmarks with tags");
+        assert_eq!(bookmarks.len(), 2);
+
+        let bookmarks = search_bookmarks(&mut conn, "", &vec!["weather".to_string()], 0, 10).await;
+        info!(?bookmarks, "searched bookmarks with tags");
+        assert_eq!(bookmarks.len(), 3);
+
+        let bookmarks = search_bookmarks(&mut conn, "", &vec!["weather".to_string()], 0, 1).await;
+        info!(?bookmarks, "searched bookmarks with tags");
+        assert_eq!(bookmarks.len(), 1);
+
+        let bookmarks = search_bookmarks(&mut conn, "", &vec!["weather".to_string()], bookmarks[0].0.id, 3).await;
         info!(?bookmarks, "searched bookmarks with tags");
         assert_eq!(bookmarks.len(), 2);
     }
