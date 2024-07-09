@@ -5,7 +5,17 @@ use rocket::serde::{Deserialize, Serialize};
 use super::schema::bookmarks;
 
 #[derive(
-    Queryable, Selectable, Identifiable, AsChangeset, Deserialize, Serialize, Debug, Clone,
+    Queryable,
+    Selectable,
+    Identifiable,
+    AsChangeset,
+    Deserialize,
+    Serialize,
+    Hash,
+    PartialEq,
+    Eq,
+    Debug,
+    Clone,
 )]
 #[diesel(table_name = bookmarks)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
@@ -215,7 +225,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    #[file_serial] // For allowing remove all data of table in test
+    #[file_serial] // For allowing remove data of table in test
     pub async fn search_bookmarks_with_pagination() {
         let mut conn = connection::establish_async().await;
         setup_searchable_bookmarks(&mut conn).await;

@@ -26,6 +26,7 @@ pq-sys = { version = "0.6.1", features = ["bundled"] } # static linking required
 # other utilities
 ##################
 rand = "0.8.5"
+itertools = "0.13.0"
 serde = { version = "1.0.203", features = ["derive"] }
 time = { version = "0.3.36", features = ["local-offset", "macros", "serde"] }
 # read settings from the dotenv file
