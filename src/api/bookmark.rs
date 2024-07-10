@@ -1,30 +1,90 @@
 use super::fairings::db::Db;
-use crate::db::bookmark::{self, Bookmark, ModifyBookmark, NewBookmark};
+use crate::db::{
+    bookmark::{self, ModifyBookmark},
+    tag,
+};
 
+use itertools::Itertools;
 use rocket::serde::json::Json;
+use rocket::serde::{Deserialize, Serialize};
 use rocket_db_pools::Connection;
 
-#[post("/", format = "application/json", data = "<payload>")]
-pub async fn create_bookmark(mut db: Connection<Db>, payload: Json<NewBookmark>) -> Json<Bookmark> {
-    let m = bookmark::create_bookmark(&mut db, payload.into_inner()).await;
-    Json(m)
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateBookmarkPayload {
+    title: String,
+    url: String,
+    tags: Vec<String>,
 }
 
-#[get("/?<title>&<before>&<limit>")]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Bookmark {
+    id: i32,
+    title: String,
+    url: String,
+    tags: Vec<String>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: time::OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub deleted_at: Option<time::OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_at: time::OffsetDateTime,
+}
+
+#[post("/", format = "application/json", data = "<payload>")]
+pub async fn create_bookmark(
+    mut db: Connection<Db>,
+    payload: Json<CreateBookmarkPayload>,
+) -> Json<Bookmark> {
+    let payload = payload.into_inner();
+    let (new_bookmark, tags) = (
+        bookmark::NewBookmark {
+            title: payload.title,
+            url: payload.url,
+        },
+        payload.tags,
+    );
+    let m = bookmark::create_bookmark(&mut db, new_bookmark).await;
+    tag::update_bookmark_tags(&mut db, &m, &tags).await;
+    Json(Bookmark {
+        id: m.id,
+        title: m.title,
+        url: m.url,
+        tags,
+        created_at: m.created_at,
+        updated_at: m.updated_at,
+        deleted_at: m.deleted_at,
+    })
+}
+
+#[get("/?<title>&<tag>&<before>&<limit>")]
 pub async fn search_bookmarks(
     mut db: Connection<Db>,
     title: Option<&str>,
+    tag: Vec<&str>,
     before: Option<i32>,
     limit: Option<i64>,
 ) -> Json<Vec<Bookmark>> {
+    let rv = tag::search_bookmarks(
+        &mut db,
+        title.unwrap_or_default(),
+        &tag.into_iter().map(|t| t.to_string()).collect_vec(),
+        before.unwrap_or_default(),
+        limit.unwrap_or(10),
+    )
+    .await;
+
     Json(
-        bookmark::search_bookmarks(
-            &mut db,
-            title.unwrap_or_default(),
-            before.unwrap_or_default(),
-            limit.unwrap_or(10),
-        )
-        .await,
+        rv.into_iter()
+            .map(|(m, tags)| Bookmark {
+                id: m.id,
+                title: m.title,
+                url: m.url,
+                tags: tags.into_iter().map(|t| t.name).collect(),
+                created_at: m.created_at,
+                updated_at: m.updated_at,
+                deleted_at: m.deleted_at,
+            })
+            .collect(),
     )
 }
 
@@ -50,10 +110,32 @@ pub async fn update_bookmark(
     id: i32,
     payload: Json<ModifyBookmark>,
 ) -> Result<Json<Bookmark>, Error> {
-    bookmark::update_bookmark(&mut db, id, payload.into_inner())
+    let m = bookmark::update_bookmark(&mut db, id, payload.into_inner())
         .await
-        .map(Json)
-        .ok_or_else(|| Error::NotFound("Bookmark not found".to_string()))
+        .ok_or_else(|| Error::NotFound("Bookmark not found".to_string()))?;
+
+    let rv = tag::get_tags_per_bookmark(&mut db, vec![m.clone()]).await;
+    if let Some((m, tags)) = rv.first() {
+        return Ok(Json(Bookmark {
+            id: m.id,
+            title: m.title.clone(),
+            url: m.url.clone(),
+            tags: tags.iter().map(|t| t.name.clone()).collect(),
+            created_at: m.created_at,
+            updated_at: m.updated_at,
+            deleted_at: m.deleted_at,
+        }));
+    }
+
+    Ok(Json(Bookmark {
+        id: m.id,
+        title: m.title,
+        url: m.url,
+        tags: vec![],
+        created_at: m.created_at,
+        updated_at: m.updated_at,
+        deleted_at: m.deleted_at,
+    }))
 }
 
 pub fn routes() -> Vec<rocket::Route> {
@@ -79,9 +161,10 @@ mod tests {
     fn create_bookmark() {
         let app = rocket::build().attach(Db::init()).mount("/", routes());
         let client = Client::tracked(app).expect("valid rocket instance");
-        let payload = NewBookmark {
+        let payload = CreateBookmarkPayload {
             url: "https://www.rust-lang.org".to_string(),
             title: "Rust".to_string(),
+            tags: vec!["rust".to_string(), "programming".to_string()],
         };
         let response = client
             .post(uri!(super::create_bookmark))
@@ -99,9 +182,10 @@ mod tests {
     fn delete_bookmark() {
         let app = rocket::build().attach(Db::init()).mount("/", routes());
         let client = Client::tracked(app).expect("valid rocket instance");
-        let payload = NewBookmark {
+        let payload = CreateBookmarkPayload {
             url: "https://www.rust-lang.org".to_string(),
             title: "Rust".to_string(),
+            tags: vec!["rust".to_string(), "programming".to_string()],
         };
         let response = client
             .post(uri!(super::create_bookmark))
@@ -124,7 +208,7 @@ mod tests {
 
         // Create some bookmarks
         let mut conn = crate::db::connection::establish_async().await;
-        crate::db::bookmark::tests::setup_searchable_bookmarks(&mut conn).await;
+        crate::db::tag::tests::setup_searchable_bookmarks(&mut conn).await;
 
         let app = rocket::build().attach(Db::init()).mount("/", routes());
         let client = Client::tracked(app).await.expect("valid rocket instance");
@@ -165,7 +249,40 @@ mod tests {
         assert_get_bookmarks!(
             format!("/?title=Weather&before={}&limit=2", results[1].id),
             results.len() == 1,
-            "Expected 1 bookmarks, got {}",
+            "Expected 1 bookmark, got {}",
+            results.len()
+        );
+
+        assert_get_bookmarks!(
+            "/?tag=global",
+            results.len() == 1,
+            "Expected 1 bookmark, got {}",
+            results.len()
+        );
+
+        assert_get_bookmarks!(
+            "/?tag=global&tag=west",
+            results.len() == 2,
+            "Expected 2 bookmarks, got {}",
+            results.len()
+        );
+
+        assert_get_bookmarks!(
+            "/?tag=weather",
+            results.len() == 3,
+            "Expected 3 bookmarks, got {}",
+            results.len()
+        );
+        assert_get_bookmarks!(
+            "/?tag=weather&limit=1",
+            results.len() == 1,
+            "Expected 1 bookmark, got {}",
+            results.len()
+        );
+        assert_get_bookmarks!(
+            format!("/?tag=weather&before={}&limit=3", results[0].id),
+            results.len() == 2,
+            "Expected 2 bookmarks, got {}",
             results.len()
         );
     }
@@ -173,6 +290,11 @@ mod tests {
     #[test]
     fn unsearchable_deleted_bookmark() {
         let payload = crate::db::bookmark::tests::rand_bookmark();
+        let payload = CreateBookmarkPayload {
+            url: payload.url,
+            title: payload.title,
+            tags: vec!["rust".to_string(), "programming".to_string()],
+        };
         info!(?payload, "creating");
         let title = payload.title.clone();
         let app = rocket::build().attach(Db::init()).mount("/", routes());
@@ -218,7 +340,12 @@ mod tests {
     fn update_exist_bookmark() {
         let app = rocket::build().attach(Db::init()).mount("/", routes());
         let client = Client::tracked(app).expect("valid rocket instance");
-        let payload = rand_bookmark();
+        let m = rand_bookmark();
+        let payload = CreateBookmarkPayload {
+            url: m.url,
+            title: m.title,
+            tags: vec!["rust".to_string(), "programming".to_string()],
+        };
         let response = client
             .post(uri!(super::create_bookmark))
             .json(&payload)

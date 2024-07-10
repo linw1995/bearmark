@@ -152,7 +152,7 @@ pub async fn search_bookmarks(
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::super::bookmark::{self, tests::rand_bookmark};
     use super::super::connection;
     use super::*;
