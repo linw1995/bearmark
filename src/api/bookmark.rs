@@ -1,8 +1,5 @@
 use super::fairings::db::Db;
-use crate::db::{
-    bookmark::{self, ModifyBookmark},
-    tag,
-};
+use crate::db::{bookmark, tag};
 
 use itertools::Itertools;
 use rocket::serde::json::Json;
@@ -92,6 +89,8 @@ pub async fn search_bookmarks(
 pub enum Error {
     #[response(status = 404)]
     NotFound(String),
+    #[response(status = 400)]
+    BadRequest(String),
 }
 
 #[delete("/<id>")]
@@ -104,15 +103,45 @@ pub async fn delete_bookmark(mut db: Connection<Db>, id: i32) -> Result<&'static
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ModifyBookmark {
+    pub title: Option<String>,
+    pub url: Option<String>,
+    pub tags: Option<Vec<String>>,
+}
+
 #[put("/<id>", format = "application/json", data = "<payload>")]
 pub async fn update_bookmark(
     mut db: Connection<Db>,
     id: i32,
     payload: Json<ModifyBookmark>,
 ) -> Result<Json<Bookmark>, Error> {
-    let m = bookmark::update_bookmark(&mut db, id, payload.into_inner())
-        .await
-        .ok_or_else(|| Error::NotFound("Bookmark not found".to_string()))?;
+    let payload = payload.into_inner();
+    let (modify_bookmark, modify_tags) = (
+        if payload.title.is_some() || payload.url.is_some() {
+            Some(bookmark::ModifyBookmark {
+                title: payload.title,
+                url: payload.url,
+            })
+        } else {
+            None
+        },
+        payload.tags,
+    );
+    if modify_bookmark.is_none() && modify_tags.is_none() {
+        return Err(Error::BadRequest("No changes".to_string()));
+    }
+
+    let m = if let Some(payload) = modify_bookmark {
+        bookmark::update_bookmark(&mut db, id, payload).await
+    } else {
+        bookmark::Bookmark::get(&mut db, id).await
+    }
+    .ok_or_else(|| Error::NotFound("Bookmark not found".to_string()))?;
+
+    if let Some(payload) = modify_tags {
+        tag::update_bookmark_tags(&mut db, &m, &payload).await;
+    }
 
     let rv = tag::get_tags_per_bookmark(&mut db, vec![m.clone()]).await;
     if let Some((m, tags)) = rv.first() {
@@ -356,6 +385,7 @@ mod tests {
         let payload = ModifyBookmark {
             url: Some("https://www.rust-lang.org".to_string()),
             title: Some("Rust Programming Language".to_string()),
+            tags: None,
         };
         assert_ne!(Some(added.title), payload.title);
         assert_ne!(Some(added.url), payload.url);
@@ -379,9 +409,82 @@ mod tests {
         let payload = ModifyBookmark {
             url: Some("https://www.rust-lang.org".to_string()),
             title: Some("Rust Programming Language".to_string()),
+            tags: None,
         };
 
         let response = client.put("/99999999").json(&payload).dispatch();
         assert_eq!(response.status(), Status::NotFound);
+    }
+
+    #[test]
+    fn update_bookmark_no_change() {
+        let app = rocket::build().attach(Db::init()).mount("/", routes());
+        let client = Client::tracked(app).expect("valid rocket instance");
+        let m = rand_bookmark();
+        let payload = CreateBookmarkPayload {
+            url: m.url,
+            title: m.title,
+            tags: vec!["rust".to_string(), "programming".to_string()],
+        };
+        let response = client
+            .post(uri!(super::create_bookmark))
+            .json(&payload)
+            .dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        let added: Bookmark = response.into_json().unwrap();
+
+        let payload = ModifyBookmark {
+            url: None,
+            title: None,
+            tags: None,
+        };
+        let response = client
+            .put(format!("/{}", added.id))
+            .json(&payload)
+            .dispatch();
+        assert_eq!(response.status(), Status::BadRequest);
+    }
+
+    #[test]
+    fn update_bookmark_tags() {
+        let app = rocket::build().attach(Db::init()).mount("/", routes());
+        let client = Client::tracked(app).expect("valid rocket instance");
+        let m = rand_bookmark();
+        let payload = CreateBookmarkPayload {
+            url: m.url,
+            title: m.title,
+            tags: vec!["rust", "programming"]
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
+        };
+        let response = client
+            .post(uri!(super::create_bookmark))
+            .json(&payload)
+            .dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        let added: Bookmark = response.into_json().unwrap();
+
+        let modify_tags = vec!["rust", "programming", "doc"]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect_vec();
+        let payload = ModifyBookmark {
+            url: None,
+            title: None,
+            tags: Some(modify_tags.clone()),
+        };
+
+        let response = client
+            .put(format!("/{}", added.id))
+            .json(&payload)
+            .dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        let updated: Bookmark = response.into_json().unwrap();
+
+        assert_eq!(updated.id, added.id);
+        assert_eq!(updated.title, added.title);
+        assert_eq!(updated.url, added.url);
+        assert_eq!(updated.tags, modify_tags);
     }
 }

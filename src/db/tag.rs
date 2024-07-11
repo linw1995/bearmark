@@ -324,7 +324,14 @@ pub mod tests {
         info!(?bookmarks, "searched bookmarks with tags");
         assert_eq!(bookmarks.len(), 1);
 
-        let bookmarks = search_bookmarks(&mut conn, "", &vec!["weather".to_string()], bookmarks[0].0.id, 3).await;
+        let bookmarks = search_bookmarks(
+            &mut conn,
+            "",
+            &vec!["weather".to_string()],
+            bookmarks[0].0.id,
+            3,
+        )
+        .await;
         info!(?bookmarks, "searched bookmarks with tags");
         assert_eq!(bookmarks.len(), 2);
     }
