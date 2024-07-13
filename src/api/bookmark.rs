@@ -186,10 +186,15 @@ mod tests {
     use rocket_db_pools::Database;
     use tracing::info;
 
-    #[test]
-    fn create_bookmark() {
+    fn test_client() -> Client {
         let app = rocket::build().attach(Db::init()).mount("/", routes());
         let client = Client::tracked(app).expect("valid rocket instance");
+        return client;
+    }
+
+    #[test]
+    fn create_bookmark() {
+        let client = test_client();
         let payload = CreateBookmarkPayload {
             url: "https://www.rust-lang.org".to_string(),
             title: "Rust".to_string(),
@@ -209,8 +214,7 @@ mod tests {
 
     #[test]
     fn delete_bookmark() {
-        let app = rocket::build().attach(Db::init()).mount("/", routes());
-        let client = Client::tracked(app).expect("valid rocket instance");
+        let client = test_client();
         let payload = CreateBookmarkPayload {
             url: "https://www.rust-lang.org".to_string(),
             title: "Rust".to_string(),
@@ -326,8 +330,7 @@ mod tests {
         };
         info!(?payload, "creating");
         let title = payload.title.clone();
-        let app = rocket::build().attach(Db::init()).mount("/", routes());
-        let client = Client::tracked(app).expect("valid rocket instance");
+        let client = test_client();
         let response = client
             .post(uri!(super::create_bookmark))
             .json(&payload)
@@ -367,8 +370,7 @@ mod tests {
 
     #[test]
     fn update_exist_bookmark() {
-        let app = rocket::build().attach(Db::init()).mount("/", routes());
-        let client = Client::tracked(app).expect("valid rocket instance");
+        let client = test_client();
         let m = rand_bookmark();
         let payload = CreateBookmarkPayload {
             url: m.url,
@@ -404,8 +406,7 @@ mod tests {
 
     #[test]
     fn update_missing_bookmark() {
-        let app = rocket::build().attach(Db::init()).mount("/", routes());
-        let client = Client::tracked(app).expect("valid rocket instance");
+        let client = test_client();
         let payload = ModifyBookmark {
             url: Some("https://www.rust-lang.org".to_string()),
             title: Some("Rust Programming Language".to_string()),
@@ -418,8 +419,7 @@ mod tests {
 
     #[test]
     fn update_bookmark_no_change() {
-        let app = rocket::build().attach(Db::init()).mount("/", routes());
-        let client = Client::tracked(app).expect("valid rocket instance");
+        let client = test_client();
         let m = rand_bookmark();
         let payload = CreateBookmarkPayload {
             url: m.url,
@@ -447,8 +447,7 @@ mod tests {
 
     #[test]
     fn update_bookmark_tags() {
-        let app = rocket::build().attach(Db::init()).mount("/", routes());
-        let client = Client::tracked(app).expect("valid rocket instance");
+        let client = test_client();
         let m = rand_bookmark();
         let payload = CreateBookmarkPayload {
             url: m.url,
