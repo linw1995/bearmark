@@ -92,6 +92,10 @@ pub async fn get_tags_per_bookmark(
     let tags = BookmarkTag::belonging_to(&bookmarks)
         .inner_join(tags::table)
         .select((BookmarkTag::as_select(), Tag::as_select()))
+        .order_by((
+            bookmarks_tags::dsl::bookmark_id.desc(),
+            tags::dsl::name.asc(),
+        ))
         .load(conn)
         .await
         .expect("Error loading tags");
@@ -200,7 +204,11 @@ pub mod tests {
         assert_eq!(bookmark.id, new_bookmark.id);
         assert!(tags.is_empty());
 
-        let tag_names = vec![rand_str(4), rand_str(4)];
+        let tag_names = vec![rand_str(4), rand_str(4)]
+            .iter()
+            .sorted()
+            .map(|i| i.to_string())
+            .collect_vec();
         update_bookmark_tags(&mut conn, &new_bookmark, &tag_names).await;
         info!(?tag_names, "updated bookmark tags");
 
@@ -210,8 +218,10 @@ pub mod tests {
         info!(?bookmark, ?tags, "bookmark has tags");
         assert_eq!(bookmark.id, new_bookmark.id);
         assert_eq!(tags.len(), 2);
-        assert_eq!(tags[0].name, tag_names[0]);
-        assert_eq!(tags[1].name, tag_names[1]);
+        assert_eq!(
+            tags.into_iter().map(|t| t.name.clone()).collect_vec(),
+            tag_names
+        );
     }
 
     pub async fn setup_searchable_bookmarks(conn: &mut Connection) {

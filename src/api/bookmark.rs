@@ -464,7 +464,7 @@ mod tests {
         assert_eq!(response.status(), Status::Ok);
         let added: Bookmark = response.into_json().unwrap();
 
-        let modify_tags = vec!["rust", "programming", "doc"]
+        let modify_tags = vec!["doc", "programming", "rust"]
             .into_iter()
             .map(|s| s.to_string())
             .collect_vec();
