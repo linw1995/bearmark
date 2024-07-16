@@ -60,7 +60,7 @@ impl Bookmark {
 
 pub async fn search_bookmarks(
     conn: &mut Connection,
-    title: &str,
+    keywords: &Vec<&str>,
     before: i32,
     limit: i64,
 ) -> Vec<Bookmark> {
@@ -71,8 +71,12 @@ pub async fn search_bookmarks(
         .filter(bookmarks::dsl::deleted_at.is_null())
         .into_boxed();
 
-    if !title.is_empty() {
-        query = query.filter(bookmarks::dsl::title.ilike(format!("%{}%", title)))
+    for keyword in keywords {
+        query = query.filter(
+            bookmarks::dsl::title
+                .ilike(format!("%{}%", keyword))
+                .or(bookmarks::dsl::url.ilike(format!("%{}%", keyword))),
+        )
     }
 
     if before > 0 {
@@ -230,28 +234,28 @@ pub(crate) mod tests {
         let mut conn = connection::establish_async().await;
         setup_searchable_bookmarks(&mut conn).await;
 
-        let results = search_bookmarks(&mut conn, "", 0, 10).await;
+        let results = search_bookmarks(&mut conn, &vec![], 0, 10).await;
         assert!(
             results.len() >= 5,
             "Expected more than 5 bookmarks, got {}",
             results.len()
         );
 
-        let results = search_bookmarks(&mut conn, "Weather", 0, 10).await;
+        let results = search_bookmarks(&mut conn, &vec!["Weather"], 0, 10).await;
         assert!(
             results.len() == 3,
             "Expected 3 bookmarks, got {}",
             results.len()
         );
 
-        let results = search_bookmarks(&mut conn, "Weather", 0, 2).await;
+        let results = search_bookmarks(&mut conn, &vec!["Weather"], 0, 2).await;
         assert!(
             results.len() == 2,
             "Expected 2 bookmarks, got {}",
             results.len()
         );
 
-        let results = search_bookmarks(&mut conn, "Weather", results[1].id, 2).await;
+        let results = search_bookmarks(&mut conn, &vec!["Weather"], results[1].id, 2).await;
         assert!(
             results.len() == 1,
             "Expected 1 bookmarks, got {}",
@@ -269,14 +273,14 @@ pub(crate) mod tests {
         assert!(m.id > 0);
         assert!(m.deleted_at.is_none());
 
-        let result = search_bookmarks(&mut conn, &title, 0, 1).await;
+        let result = search_bookmarks(&mut conn, &vec![&title], 0, 1).await;
         info!(?result, "searched");
         assert!(result.len() == 1);
 
         let count = delete_bookmarks(&mut conn, vec![m.id]).await;
         assert!(count == 1);
 
-        let result = search_bookmarks(&mut conn, &title, 0, 1).await;
+        let result = search_bookmarks(&mut conn, &vec![&title], 0, 1).await;
         info!(?result, "searched");
         assert!(result.len() == 0);
     }

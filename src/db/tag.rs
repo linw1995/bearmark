@@ -108,13 +108,13 @@ pub async fn get_tags_per_bookmark(
 
 pub async fn search_bookmarks(
     conn: &mut Connection,
-    title: &str,
-    tags: &Vec<String>,
+    keywords: &Vec<&str>,
+    tags: &Vec<&str>,
     before: i32,
     limit: i64,
 ) -> Vec<(Bookmark, Vec<Tag>)> {
     if tags.is_empty() {
-        bookmark::search_bookmarks(conn, title, before, limit)
+        bookmark::search_bookmarks(conn, keywords, before, limit)
             .await
             .into_iter()
             .map(|b| (b, vec![]))
@@ -128,11 +128,18 @@ pub async fn search_bookmarks(
             .select(Bookmark::as_select())
             .distinct_on(bookmarks::id)
             .filter(bookmarks::dsl::deleted_at.is_null())
-            .filter(schema::tags::dsl::name.eq_any(tags))
             .into_boxed();
 
-        if !title.is_empty() {
-            query = query.filter(bookmarks::dsl::title.ilike(format!("%{}%", title)))
+        for tag in tags {
+            query = query.filter(tags::dsl::name.ilike(format!("%{}%", tag)));
+        }
+
+        for keyword in keywords {
+            query = query.filter(
+                bookmarks::dsl::title
+                    .ilike(format!("%{}%", keyword))
+                    .or(bookmarks::dsl::url.ilike(format!("%{}%", keyword))),
+            )
         }
 
         if before > 0 {
@@ -219,7 +226,10 @@ pub mod tests {
         assert_eq!(bookmark.id, new_bookmark.id);
         assert_eq!(tags.len(), 2);
         assert_eq!(
-            tags.into_iter().map(|t| t.name.clone()).collect_vec(),
+            tags.into_iter()
+                .map(|t| t.name.clone())
+                .sorted()
+                .collect_vec(),
             tag_names
         );
     }
@@ -294,54 +304,33 @@ pub mod tests {
         let mut conn = connection::establish_async().await;
         setup_searchable_bookmarks(&mut conn).await;
 
-        let bookmarks = search_bookmarks(&mut conn, "Weather", &vec![], 0, 10).await;
+        let bookmarks = search_bookmarks(&mut conn, &vec!["Weather"], &vec![], 0, 10).await;
         info!(?bookmarks, "searched bookmarks");
         assert_eq!(bookmarks.len(), 3);
 
-        let bookmarks = search_bookmarks(
-            &mut conn,
-            "Weather",
-            &vec!["global"]
-                .into_iter()
-                .map(|i| i.to_string())
-                .collect_vec(),
-            0,
-            10,
-        )
-        .await;
+        let bookmarks = search_bookmarks(&mut conn, &vec!["Weather"], &vec!["global"], 0, 10).await;
         info!(?bookmarks, "searched bookmarks with tags");
         assert_eq!(bookmarks.len(), 1);
 
-        let bookmarks = search_bookmarks(
-            &mut conn,
-            "Weather",
-            &vec!["global", "west"]
-                .into_iter()
-                .map(|i| i.to_string())
-                .collect_vec(),
-            0,
-            10,
-        )
-        .await;
+        let bookmarks = search_bookmarks(&mut conn, &vec!["Weather"], &vec!["west"], 0, 10).await;
         info!(?bookmarks, "searched bookmarks with tags");
-        assert_eq!(bookmarks.len(), 2);
+        assert_eq!(bookmarks.len(), 1);
 
-        let bookmarks = search_bookmarks(&mut conn, "", &vec!["weather".to_string()], 0, 10).await;
+        let bookmarks =
+            search_bookmarks(&mut conn, &vec!["Weather"], &vec!["global", "west"], 0, 10).await;
+        info!(?bookmarks, "searched bookmarks with tags");
+        assert_eq!(bookmarks.len(), 0);
+
+        let bookmarks = search_bookmarks(&mut conn, &vec![], &vec!["weather"], 0, 10).await;
         info!(?bookmarks, "searched bookmarks with tags");
         assert_eq!(bookmarks.len(), 3);
 
-        let bookmarks = search_bookmarks(&mut conn, "", &vec!["weather".to_string()], 0, 1).await;
+        let bookmarks = search_bookmarks(&mut conn, &vec![], &vec!["weather"], 0, 1).await;
         info!(?bookmarks, "searched bookmarks with tags");
         assert_eq!(bookmarks.len(), 1);
 
-        let bookmarks = search_bookmarks(
-            &mut conn,
-            "",
-            &vec!["weather".to_string()],
-            bookmarks[0].0.id,
-            3,
-        )
-        .await;
+        let bookmarks =
+            search_bookmarks(&mut conn, &vec![], &vec!["weather"], bookmarks[0].0.id, 3).await;
         info!(?bookmarks, "searched bookmarks with tags");
         assert_eq!(bookmarks.len(), 2);
     }

@@ -1,10 +1,12 @@
 use super::fairings::db::Db;
 use crate::db::{bookmark, tag};
+use crate::utils::search;
 
 use itertools::Itertools;
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
 use rocket_db_pools::Connection;
+use tracing::warn;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateBookmarkPayload {
@@ -53,24 +55,50 @@ pub async fn create_bookmark(
     })
 }
 
-#[get("/?<title>&<tag>&<before>&<limit>")]
+#[get("/?<q>&<before>&<limit>")]
 pub async fn search_bookmarks(
     mut db: Connection<Db>,
-    title: Option<&str>,
-    tag: Vec<&str>,
+    q: Option<&str>,
     before: Option<i32>,
     limit: Option<i64>,
-) -> Json<Vec<Bookmark>> {
-    let rv = tag::search_bookmarks(
-        &mut db,
-        title.unwrap_or_default(),
-        &tag.into_iter().map(|t| t.to_string()).collect_vec(),
-        before.unwrap_or_default(),
-        limit.unwrap_or(10),
-    )
-    .await;
+) -> Result<Json<Vec<Bookmark>>, Error> {
+    use pratt_gen::{parse, Arena, Source};
 
-    Json(
+    let rv = if let Some(q) = q {
+        let out_arena = Arena::new();
+        let err_arena = Arena::new();
+        let source = Source::new(q);
+        let rv = parse::<search::Query>(source, &out_arena, &err_arena);
+        if let Ok(rv) = rv {
+            let (tags, keywords) = rv
+                .into_iter()
+                .partition::<Vec<_>, _>(|p| matches!(p, search::Primitive::Tag(_)));
+            let keywords = keywords.into_iter().map(|k| k.into()).collect_vec();
+            let tags = tags.into_iter().map(|k| k.into()).collect_vec();
+            tag::search_bookmarks(
+                &mut db,
+                &keywords,
+                &tags,
+                before.unwrap_or_default(),
+                limit.unwrap_or(10),
+            )
+            .await
+        } else {
+            warn!(?q, ?rv, "Invalid query");
+            return Err(Error::BadRequest("Invalid query".to_string()));
+        }
+    } else {
+        tag::search_bookmarks(
+            &mut db,
+            &vec![],
+            &vec![],
+            before.unwrap_or_default(),
+            limit.unwrap_or(10),
+        )
+        .await
+    };
+
+    Ok(Json(
         rv.into_iter()
             .map(|(m, tags)| Bookmark {
                 id: m.id,
@@ -82,7 +110,7 @@ pub async fn search_bookmarks(
                 deleted_at: m.deleted_at,
             })
             .collect(),
-    )
+    ))
 }
 
 #[derive(Responder)]
@@ -178,6 +206,8 @@ pub fn routes() -> Vec<rocket::Route> {
 
 #[cfg(test)]
 mod tests {
+    use crate::utils;
+
     use super::*;
 
     use bookmark::tests::rand_bookmark;
@@ -266,54 +296,65 @@ mod tests {
         );
 
         assert_get_bookmarks!(
-            "/?title=Weather",
+            "/?q=Weather",
             results.len() == 3,
             "Expected 3 bookmarks, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            "/?title=Weather&limit=2",
+            "/?q=Weather&limit=2",
             results.len() == 2,
             "Expected 2 bookmarks, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            format!("/?title=Weather&before={}&limit=2", results[1].id),
+            format!("/?q=Weather&before={}&limit=2", results[1].id),
             results.len() == 1,
             "Expected 1 bookmark, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            "/?tag=global",
+            format!("/?q={}", utils::percent_encoding("#global weather")),
             results.len() == 1,
             "Expected 1 bookmark, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            "/?tag=global&tag=west",
-            results.len() == 2,
-            "Expected 2 bookmarks, got {}",
+            format!("/?q={}", utils::percent_encoding("#west weather")),
+            results.len() == 1,
+            "Expected 1 bookmark, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            "/?tag=weather",
+            format!("/?q={}", utils::percent_encoding("#global #west weather")),
+            results.len() == 0,
+            "Expected 0 bookmark, got {}",
+            results.len()
+        );
+
+        assert_get_bookmarks!(
+            format!("/?q={}", utils::percent_encoding("#weather")),
             results.len() == 3,
             "Expected 3 bookmarks, got {}",
             results.len()
         );
         assert_get_bookmarks!(
-            "/?tag=weather&limit=1",
+            format!("/?q={}&limit=1", utils::percent_encoding("#weather")),
             results.len() == 1,
             "Expected 1 bookmark, got {}",
             results.len()
         );
         assert_get_bookmarks!(
-            format!("/?tag=weather&before={}&limit=3", results[0].id),
+            format!(
+                "/?q={}&limit=3&before={}",
+                utils::percent_encoding("#weather"),
+                results[0].id
+            ),
             results.len() == 2,
             "Expected 2 bookmarks, got {}",
             results.len()
@@ -343,7 +384,7 @@ mod tests {
 
         macro_rules! assert_get_bookmark {
             ($($assert_args:expr),*) => {
-                let response = client.get(format!("/?title={}", title)).dispatch();
+                let response = client.get(format!("/?q={}", title)).dispatch();
                 assert_eq!(response.status(), Status::Ok);
                 results = response.into_json().unwrap();
                 assert!(

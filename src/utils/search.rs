@@ -75,6 +75,7 @@ impl<'a> Iterator for Query<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use tracing::debug;
 
     #[test]
     fn query() {
@@ -82,27 +83,21 @@ mod test {
         let out_arena = Arena::new();
         let err_arena = Arena::new();
         let rv = parse::<Query>(source, &out_arena, &err_arena);
-        println!("{:?}", rv);
-        assert!(rv.is_ok());
+        debug!(?rv, "parsed");
 
+        assert!(rv.is_ok());
         let rv = rv.unwrap().collect::<Vec<Primitive>>();
-        println!("{:?}", rv);
+        debug!(?rv, "collect into vec");
 
         let (tags, keywords): (Vec<_>, Vec<_>) =
             rv.into_iter().partition(|x| matches!(x, Primitive::Tag(_)));
-
         assert_eq!(tags.len(), 3);
         assert_eq!(keywords.len(), 2);
-        println!(
-            "tags: {:?}",
-            tags.into_iter().map(|x| x.into()).collect::<Vec<&str>>()
-        );
-        println!(
-            "keywords: {:?}",
-            keywords
-                .into_iter()
-                .map(|x| x.into())
-                .collect::<Vec<&str>>()
-        );
+        let tags = tags.into_iter().map(|x| x.into()).collect::<Vec<&str>>();
+        let keywords = keywords
+            .into_iter()
+            .map(|x| x.into())
+            .collect::<Vec<&str>>();
+        debug!(?tags, ?keywords, "the query conditions for where clause");
     }
 }

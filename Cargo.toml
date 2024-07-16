@@ -29,6 +29,7 @@ rand = "0.8.5"
 itertools = "0.13.0"
 serde = { version = "1.0.203", features = ["derive"] }
 time = { version = "0.3.36", features = ["local-offset", "macros", "serde"] }
+percent-encoding = "2.3.1"
 # search enhancement
 pratt-gen = "0.1.0"
 # read settings from the dotenv file
