@@ -6,7 +6,7 @@ use itertools::Itertools;
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
 use rocket_db_pools::Connection;
-use tracing::warn;
+use tracing::{debug, warn};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateBookmarkPayload {
@@ -75,6 +75,7 @@ pub async fn search_bookmarks(
                 .partition::<Vec<_>, _>(|p| matches!(p, search::Primitive::Tag(_)));
             let keywords = keywords.into_iter().map(|k| k.into()).collect_vec();
             let tags = tags.into_iter().map(|k| k.into()).collect_vec();
+            debug!(?tags, ?keywords, "the query conditions for where clause");
             tag::search_bookmarks(
                 &mut db,
                 &keywords,
@@ -97,6 +98,8 @@ pub async fn search_bookmarks(
         )
         .await
     };
+
+    debug!(?rv, "search results");
 
     Ok(Json(
         rv.into_iter()

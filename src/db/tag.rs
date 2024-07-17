@@ -113,12 +113,8 @@ pub async fn search_bookmarks(
     before: i32,
     limit: i64,
 ) -> Vec<(Bookmark, Vec<Tag>)> {
-    if tags.is_empty() {
-        bookmark::search_bookmarks(conn, keywords, before, limit)
-            .await
-            .into_iter()
-            .map(|b| (b, vec![]))
-            .collect()
+    let bs = if tags.is_empty() {
+        bookmark::search_bookmarks(conn, keywords, before, limit).await
     } else {
         use super::schema::{self, bookmarks, bookmarks_tags};
 
@@ -146,20 +142,20 @@ pub async fn search_bookmarks(
             query = query.filter(bookmarks::dsl::id.lt(before))
         }
 
-        let bs = query
+        query
             .order_by(bookmarks::dsl::id.desc())
             .limit(limit)
             .load::<Bookmark>(conn)
             .await
-            .expect("Error loading bookmarks");
+            .expect("Error loading bookmarks")
+    };
 
-        debug!(?bs, "bookmarks without tags");
+    debug!(?bs, "bookmarks without tags");
 
-        // Group bookmark and tags
-        let bs_ts = get_tags_per_bookmark(conn, bs).await;
-        debug!(?bs_ts, "bookmarks with tags");
-        bs_ts
-    }
+    // Group bookmark and tags
+    let bs_ts = get_tags_per_bookmark(conn, bs).await;
+    debug!(?bs_ts, "bookmarks with tags");
+    bs_ts
 }
 
 #[cfg(test)]
