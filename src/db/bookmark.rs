@@ -145,7 +145,7 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn create_new_bookmark() {
         let new_bookmark = rand_bookmark();
-        let mut conn = connection::establish_async().await;
+        let mut conn = connection::establish().await;
 
         let m = create_bookmark(&mut conn, new_bookmark).await;
 
@@ -155,7 +155,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn title_search_bookmark() {
-        let mut conn = connection::establish_async().await;
+        let mut conn = connection::establish().await;
         let new_bookmark = rand_bookmark();
         let title = new_bookmark.title.clone();
         create_bookmark(&mut conn, new_bookmark).await;
@@ -173,7 +173,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     pub async fn delete_a_bookmark() {
-        let mut conn = connection::establish_async().await;
+        let mut conn = connection::establish().await;
         let new_bookmark = rand_bookmark();
         let m = create_bookmark(&mut conn, new_bookmark).await;
         assert!(m.id > 0);
@@ -231,7 +231,7 @@ pub(crate) mod tests {
     #[tokio::test]
     #[file_serial] // For allowing remove data of table in test
     pub async fn search_bookmarks_with_pagination() {
-        let mut conn = connection::establish_async().await;
+        let mut conn = connection::establish().await;
         setup_searchable_bookmarks(&mut conn).await;
 
         let results = search_bookmarks(&mut conn, &vec![], 0, 10).await;
@@ -265,7 +265,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn unsearchable_deleted_bookmark() {
-        let mut conn = connection::establish_async().await;
+        let mut conn = connection::establish().await;
         let new_bookmark = rand_bookmark();
         let title = new_bookmark.title.clone();
         let m = create_bookmark(&mut conn, new_bookmark).await;
@@ -287,7 +287,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn update_exists_bookmark() {
-        let mut conn = connection::establish_async().await;
+        let mut conn = connection::establish().await;
         let new = rand_bookmark();
         let bm = create_bookmark(&mut conn, new.clone()).await;
         assert!(bm.id > 0);

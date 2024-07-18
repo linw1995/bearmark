@@ -273,7 +273,7 @@ mod tests {
         use rocket::local::asynchronous::Client;
 
         // Create some bookmarks
-        let mut conn = crate::db::connection::establish_async().await;
+        let mut conn = crate::db::connection::establish().await;
         crate::db::tag::tests::setup_searchable_bookmarks(&mut conn).await;
 
         let app = rocket::build().attach(Db::init()).mount("/", routes());

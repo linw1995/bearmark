@@ -1,4 +1,5 @@
-use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel::connection::InstrumentationEvent;
+use diesel_async::{pooled_connection::AsyncDieselConnectionManager, AsyncConnection};
 use dotenvy::dotenv;
 use rocket::figment::Figment;
 use rocket_db_pools::{Database, Error, Pool};
@@ -28,7 +29,13 @@ impl Pool for DBPool {
     async fn get(&self) -> Result<Self::Connection, Self::Error> {
         // Get one connection from the pool, here via an `acquire()` method.
         // Map errors of type `GetError` to `Error<_, GetError>`.
-        self.0.get().await.map_err(Error::Get)
+        let mut conn = self.0.get().await.map_err(Error::Get)?;
+
+        conn.set_instrumentation(|event: InstrumentationEvent<'_>| {
+            tracing::debug!(?event);
+        });
+
+        Ok(conn)
     }
 
     async fn close(&self) {

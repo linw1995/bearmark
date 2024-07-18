@@ -172,7 +172,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn test_get_or_create_tags() {
-        let mut conn = connection::establish_async().await;
+        let mut conn = connection::establish().await;
 
         let tag_names = vec![rand_str(4), rand_str(4)];
         let rv = get_tags(&mut conn, &tag_names).await;
@@ -195,7 +195,7 @@ pub mod tests {
 
     #[tokio::test]
     async fn test_update_bookmark_tags() {
-        let mut conn = connection::establish_async().await;
+        let mut conn = connection::establish().await;
 
         let new_bookmark = bookmark::create_bookmark(&mut conn, rand_bookmark()).await;
         info!(?new_bookmark, "created bookmark");
@@ -297,7 +297,7 @@ pub mod tests {
     #[tokio::test]
     #[file_serial] // For allowing remove data of table in test
     async fn test_search_bookmarks() {
-        let mut conn = connection::establish_async().await;
+        let mut conn = connection::establish().await;
         setup_searchable_bookmarks(&mut conn).await;
 
         let bookmarks = search_bookmarks(&mut conn, &vec!["Weather"], &vec![], 0, 10).await;
