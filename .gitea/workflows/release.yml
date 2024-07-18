@@ -44,7 +44,7 @@ jobs:
           sccache --stop-server || sccache --start-server
       - name: Build
         run: |
-          export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl 
+          export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl
           cargo build --bin serve --release --verbose
           cp ./target/x86_64-unknown-linux-musl/release/serve ./server
       - name: Login to Docker Hub

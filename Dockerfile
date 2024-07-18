@@ -1,6 +1,6 @@
 FROM alpine
 
-RUN apk add --no-cache tzdata 
+RUN apk add --no-cache tzdata
 
 COPY ./server /usr/local/bin/server
 

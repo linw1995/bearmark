@@ -11,4 +11,3 @@ CREATE TABLE bookmarks_tags(
     tag_id integer REFERENCES tags(id) ON DELETE CASCADE,
     PRIMARY KEY (bookmark_id, tag_id)
 );
-

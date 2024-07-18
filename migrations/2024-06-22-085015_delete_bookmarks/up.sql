@@ -1,3 +1,3 @@
 ALTER TABLE bookmarks
-ADD COLUMN deleted_at TIMESTAMP(6) 
+ADD COLUMN deleted_at TIMESTAMP(6)
 WITH TIME ZONE;

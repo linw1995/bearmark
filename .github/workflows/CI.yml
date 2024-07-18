@@ -70,7 +70,7 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        ./scripts/cli.sh coverage      
+        ./scripts/cli.sh coverage
       env:
         CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
         SCCACHE_GHA_ENABLED: "true"

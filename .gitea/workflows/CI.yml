@@ -75,15 +75,15 @@ jobs:
           ./scripts/cli.sh setup
       - name: Run lints
         run: |
-          export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl 
+          export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl
           ./scripts/cli.sh lint
       - name: Run tests with coverage
         run: |
-          export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl 
+          export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl
           ./scripts/cli.sh coverage
       # - name: Try to build release
       #   continue-on-error: true
       #   run: |
-      #     export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl 
+      #     export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl
       #     cargo build --bin serve --release --verbose
       #     find . -name serve -type f
