@@ -40,6 +40,9 @@ tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 # async runtime
 tokio = { version = "1.38.0", features = ["rt", "macros", "sync"] }
+# error handling
+anyhow = "1.0.86"
+thiserror = "1.0.63"
 
 [dev-dependencies]
 # setup for tests

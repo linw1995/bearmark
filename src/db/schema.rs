@@ -12,9 +12,25 @@ diesel::table! {
 }
 
 diesel::table! {
+    bookmarks_folders (bookmark_id, folder_id) {
+        bookmark_id -> Int4,
+        folder_id -> Int4,
+    }
+}
+
+diesel::table! {
     bookmarks_tags (bookmark_id, tag_id) {
         bookmark_id -> Int4,
         tag_id -> Int4,
+    }
+}
+
+diesel::table! {
+    folders (id) {
+        id -> Int4,
+        path -> Varchar,
+        updated_at -> Timestamptz,
+        created_at -> Timestamptz,
     }
 }
 
@@ -27,7 +43,15 @@ diesel::table! {
     }
 }
 
+diesel::joinable!(bookmarks_folders -> bookmarks (bookmark_id));
+diesel::joinable!(bookmarks_folders -> folders (folder_id));
 diesel::joinable!(bookmarks_tags -> bookmarks (bookmark_id));
 diesel::joinable!(bookmarks_tags -> tags (tag_id));
 
-diesel::allow_tables_to_appear_in_same_query!(bookmarks, bookmarks_tags, tags,);
+diesel::allow_tables_to_appear_in_same_query!(
+    bookmarks,
+    bookmarks_folders,
+    bookmarks_tags,
+    folders,
+    tags,
+);
