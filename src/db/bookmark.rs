@@ -29,6 +29,7 @@ pub struct Bookmark {
     pub deleted_at: Option<time::OffsetDateTime>,
     #[serde(with = "time::serde::rfc3339")]
     pub updated_at: time::OffsetDateTime,
+    pub folder_id: Option<i32>,
 }
 
 #[derive(Insertable, AsChangeset, Deserialize, Serialize, Debug, Clone)]

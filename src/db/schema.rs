@@ -8,13 +8,7 @@ diesel::table! {
         created_at -> Timestamptz,
         deleted_at -> Nullable<Timestamptz>,
         updated_at -> Timestamptz,
-    }
-}
-
-diesel::table! {
-    bookmarks_folders (bookmark_id, folder_id) {
-        bookmark_id -> Int4,
-        folder_id -> Int4,
+        folder_id -> Nullable<Int4>,
     }
 }
 
@@ -43,15 +37,8 @@ diesel::table! {
     }
 }
 
-diesel::joinable!(bookmarks_folders -> bookmarks (bookmark_id));
-diesel::joinable!(bookmarks_folders -> folders (folder_id));
+diesel::joinable!(bookmarks -> folders (folder_id));
 diesel::joinable!(bookmarks_tags -> bookmarks (bookmark_id));
 diesel::joinable!(bookmarks_tags -> tags (tag_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    bookmarks,
-    bookmarks_folders,
-    bookmarks_tags,
-    folders,
-    tags,
-);
+diesel::allow_tables_to_appear_in_same_query!(bookmarks, bookmarks_tags, folders, tags,);

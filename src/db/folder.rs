@@ -2,8 +2,7 @@ use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection as Connection, RunQueryDsl};
 use rocket::serde::{Deserialize, Serialize};
 
-use super::bookmark::Bookmark;
-use super::schema::{bookmarks_folders, folders};
+use super::schema::folders;
 use crate::utils::DatabaseError;
 
 #[derive(Queryable, Selectable, Identifiable, Debug, Deserialize, Serialize)]
@@ -16,16 +15,6 @@ pub struct Folder {
     pub created_at: time::OffsetDateTime,
     #[serde(with = "time::serde::rfc3339")]
     pub updated_at: time::OffsetDateTime,
-}
-
-#[derive(Insertable, Identifiable, Selectable, Queryable, Associations, Debug)]
-#[diesel(belongs_to(Bookmark))]
-#[diesel(belongs_to(Folder))]
-#[diesel(table_name = bookmarks_folders)]
-#[diesel(primary_key(bookmark_id, folder_id))]
-pub struct BookmarkFolder {
-    pub bookmark_id: i32,
-    pub folder_id: i32,
 }
 
 #[derive(Insertable, Debug, Clone)]
