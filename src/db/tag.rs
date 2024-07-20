@@ -356,36 +356,27 @@ pub mod tests {
     }
 
     #[tokio::test]
-    #[file_serial] // For allowing remove data of table in test
     async fn test_search_tags() {
         let mut conn = connection::establish().await;
         let tags = vec![
-            "weather",
-            "forecast",
-            "news",
-            "world",
-            "sports",
-            "football",
-            "tech",
-            "gadgets",
-            "global",
-            "west",
-            "programming",
+            "weather#1",
+            "weather#2",
+            "weather#3",
+            "global#1",
+            "global#2",
         ]
         .into_iter()
         .map(|t| t.to_string())
         .collect_vec();
 
-        let _ = diesel::delete(tags::table).execute(&mut conn).await;
-
         get_or_create_tags(&mut conn, &tags).await;
 
-        let tags = search_tags(&mut conn, &vec!["weather"], 0, 10).await;
-        info!(?tags, "searched tags");
-        assert_eq!(tags.len(), 1);
-
-        let tags = search_tags(&mut conn, &vec!["g"], 0, 4).await;
+        let tags = search_tags(&mut conn, &vec!["weather#"], 0, 10).await;
         info!(?tags, "searched tags");
         assert_eq!(tags.len(), 3);
+
+        let tags = search_tags(&mut conn, &vec!["global#"], 0, 4).await;
+        info!(?tags, "searched tags");
+        assert_eq!(tags.len(), 2);
     }
 }
