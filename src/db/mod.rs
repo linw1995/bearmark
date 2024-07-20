@@ -8,6 +8,3 @@ pub mod tag;
 
 // Driver
 pub mod connection;
-
-mod errors;
-pub use errors::DatabaseError;

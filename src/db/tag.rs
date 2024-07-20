@@ -151,10 +151,16 @@ pub async fn search_bookmarks(
             .into_boxed();
 
         for tag in tags {
+            if tag.is_empty() {
+                continue;
+            }
             query = query.filter(tags::dsl::name.ilike(format!("%{}%", tag)));
         }
 
         for keyword in keywords {
+            if keyword.is_empty() {
+                continue;
+            }
             query = query.filter(
                 bookmarks::dsl::title
                     .ilike(format!("%{}%", keyword))

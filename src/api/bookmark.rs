@@ -1,11 +1,12 @@
+use super::errors::Error;
 use super::fairings::db::Db;
 use crate::db::{bookmark, tag};
-use crate::utils::search;
+use crate::utils::{search, BearQLError};
 
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
 use rocket_db_pools::Connection;
-use tracing::{debug, warn};
+use tracing::debug;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateBookmarkPayload {
@@ -66,21 +67,26 @@ pub async fn search_bookmarks(
     let rv = if let Some(q) = q {
         let out_arena = Arena::new();
         let err_arena = Arena::new();
-        let rv = search::parse_query(q, &out_arena, &err_arena);
-        if let Ok(rv) = rv {
-            debug!(?rv, "the query conditions for where clause");
-            tag::search_bookmarks(
-                &mut db,
-                &rv.keywords,
-                &rv.tags,
-                before.unwrap_or_default(),
-                limit.unwrap_or(10),
-            )
-            .await
-        } else {
-            warn!(?q, ?rv, "Invalid query");
-            return Err(Error::BadRequest("Invalid query".to_string()));
+        let rv = search::parse_query(q, &out_arena, &err_arena)?;
+        debug!(?rv, "the query conditions for where clause");
+
+        // check if it has empty keyword
+        if rv.keywords.iter().any(|f| f.trim().is_empty()) {
+            return Err(BearQLError::EmptyKeyword.into());
         }
+        // check if it has empty tag
+        if rv.tags.iter().any(|f| f.trim().is_empty()) {
+            return Err(BearQLError::EmptyTag.into());
+        }
+
+        tag::search_bookmarks(
+            &mut db,
+            &rv.keywords,
+            &rv.tags,
+            before.unwrap_or_default(),
+            limit.unwrap_or(10),
+        )
+        .await
     } else {
         tag::search_bookmarks(
             &mut db,
@@ -107,14 +113,6 @@ pub async fn search_bookmarks(
             })
             .collect(),
     ))
-}
-
-#[derive(Responder)]
-pub enum Error {
-    #[response(status = 404)]
-    NotFound(String),
-    #[response(status = 400)]
-    BadRequest(String),
 }
 
 #[delete("/<id>")]

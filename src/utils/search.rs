@@ -2,6 +2,9 @@ use itertools::Itertools;
 use pratt_gen::*;
 use serde::Serializer;
 use std::fmt::Debug;
+use tracing::warn;
+
+use super::BearQLError;
 
 #[derive(Debug, Clone, Copy, ParserImpl, Space)]
 pub enum Query<'a> {
@@ -137,9 +140,16 @@ pub fn parse_query<'a>(
     raw: &'a str,
     out_arena: &'a Arena,
     err_arena: &'a Arena,
-) -> Result<QueryResult<'a>, Error<'a>> {
+) -> Result<QueryResult<'a>, BearQLError> {
     let source = Source::new(raw);
-    let rv = parse::<Query>(source, out_arena, err_arena)?;
+    let rv = parse::<Query>(source, out_arena, err_arena).map_err(|e| {
+        warn!(?raw, ?e, "failed to parse query");
+        BearQLError::SyntaxError {
+            msg: "failed to parse query".to_string(),
+            ql: raw.to_string(),
+            err_msg: format!("{:?}", e),
+        }
+    })?;
     let rv = rv.collect::<Vec<Primitive>>();
 
     let mut tags = vec![];

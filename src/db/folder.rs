@@ -4,7 +4,7 @@ use rocket::serde::{Deserialize, Serialize};
 
 use super::bookmark::Bookmark;
 use super::schema::{bookmarks_folders, folders};
-use super::DatabaseError;
+use crate::utils::DatabaseError;
 
 #[derive(Queryable, Selectable, Identifiable, Debug, Deserialize, Serialize)]
 #[diesel(table_name = folders)]

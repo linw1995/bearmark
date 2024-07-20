@@ -7,3 +7,6 @@ pub fn percent_encoding(query: &str) -> String {
 
     utf8_percent_encode(query, NON_ALPHANUMERIC).to_string()
 }
+
+mod errors;
+pub use errors::{BearQLError, DatabaseError};
