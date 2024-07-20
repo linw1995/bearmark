@@ -18,7 +18,7 @@ pub enum Primitive<'a> {
     #[parse("/{0}")]
     Path(Path<'a>),
     #[parse("#{0}")]
-    Tag(Keyword<'a>),
+    Tag(Tag<'a>),
     #[parse("{0}")]
     Keyword(Keyword<'a>),
 }
@@ -33,6 +33,14 @@ pub enum Path<'a> {
     JoinJoin(),
     #[parse("")]
     Empty(),
+}
+
+#[derive(Debug, Clone, Copy, ParserImpl, Space)]
+pub enum Tag<'a> {
+    #[parse("{0}")]
+    Keyword(Keyword<'a>),
+    #[parse("")]
+    Null(),
 }
 
 #[derive(Clone, Copy, ParserImpl, Space)]
@@ -63,6 +71,15 @@ impl<'a> From<Keyword<'a>> for &'a str {
         match k {
             Keyword::Quoted(s) => s,
             Keyword::Unquoted(s) => s.0,
+        }
+    }
+}
+
+impl<'a> From<Tag<'a>> for &'a str {
+    fn from(t: Tag<'a>) -> &'a str {
+        match t {
+            Tag::Keyword(k) => k.into(),
+            Tag::Null() => "",
         }
     }
 }
@@ -147,7 +164,7 @@ pub fn parse_query<'a>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use tracing::debug;
+    use tracing::{debug, info};
 
     fn to_str_vec<'a>(primitives: Vec<Primitive<'a>>, arena: &'a Arena) -> Vec<&'a str> {
         primitives
@@ -184,6 +201,8 @@ mod test {
             (r#"rust"#, vec![], vec!["rust"]),
             (r#""rust pl""#, vec![], vec!["rust pl"]),
             (r#"#rust"#, vec!["rust"], vec![]),
+            (r#"#"#, vec![""], vec![]),
+            (r#"# title"#, vec![""], vec!["title"]),
             (r#"#"special tag""#, vec!["special tag"], vec![]),
             (
                 r#"#rust #pl title "my title" #"I'm" "#,
@@ -191,6 +210,7 @@ mod test {
                 vec!["title", "my title"],
             ),
         ] {
+            info!(?raw, ?expect_tags, ?expect_keywords, "testing query");
             let rv = parse_query(raw, &out_arena, &err_arena);
 
             let (tags, keywords) = rv.into_iter().partition(|x| matches!(x, Primitive::Tag(_)));
