@@ -2,7 +2,6 @@ use super::fairings::db::Db;
 use crate::db::{bookmark, tag};
 use crate::utils::search;
 
-use itertools::Itertools;
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
 use rocket_db_pools::Connection;
@@ -62,24 +61,18 @@ pub async fn search_bookmarks(
     before: Option<i32>,
     limit: Option<i64>,
 ) -> Result<Json<Vec<Bookmark>>, Error> {
-    use pratt_gen::{parse, Arena, Source};
+    use pratt_gen::Arena;
 
     let rv = if let Some(q) = q {
         let out_arena = Arena::new();
         let err_arena = Arena::new();
-        let source = Source::new(q);
-        let rv = parse::<search::Query>(source, &out_arena, &err_arena);
+        let rv = search::parse_query(q, &out_arena, &err_arena);
         if let Ok(rv) = rv {
-            let (tags, keywords) = rv
-                .into_iter()
-                .partition::<Vec<_>, _>(|p| matches!(p, search::Primitive::Tag(_)));
-            let keywords = keywords.into_iter().map(|k| k.into()).collect_vec();
-            let tags = tags.into_iter().map(|k| k.into()).collect_vec();
-            debug!(?tags, ?keywords, "the query conditions for where clause");
+            debug!(?rv, "the query conditions for where clause");
             tag::search_bookmarks(
                 &mut db,
-                &keywords,
-                &tags,
+                &rv.keywords,
+                &rv.tags,
                 before.unwrap_or_default(),
                 limit.unwrap_or(10),
             )
@@ -212,8 +205,9 @@ mod tests {
     use crate::utils;
 
     use super::*;
-
     use bookmark::tests::rand_bookmark;
+
+    use itertools::Itertools;
     use rocket::http::Status;
     use rocket::local::blocking::Client;
     use rocket_db_pools::Database;
