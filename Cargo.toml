@@ -11,7 +11,7 @@ rocket_db_pools = "0.2.0"
 
 # database
 diesel = { version = "2.2.0", features = ["postgres", "time"] }
-diesel-async = { version = "0.4.1", features = [
+diesel-async = { version = "0.5.0", features = [
 	"async-connection-wrapper",
 	"postgres",
 	"deadpool",
@@ -48,9 +48,6 @@ thiserror = "1.0.63"
 # setup for tests
 ctor = "0.2.8"
 serial_test = { version = "3.1.1", features = ["file_locks"] }
-
-[patch.crates-io]
-diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "6437e59" }
 
 [[bin]]
 name = "serve"
