@@ -25,6 +25,10 @@ help() {
 	echo "  install-tarpaulin: Install tarpaulin"
 }
 
+cleanup_profraw_files() {
+	find . -type f -name "*.profraw" -delete
+}
+
 cd "$(dirname "$0")"/../
 
 main() {
@@ -47,6 +51,7 @@ main() {
 	"lint")
 		echo ">>> Running clippy"
 		cargo clippy --all-features "$@"
+		cleanup_profraw_files
 		;;
 	"setup")
 		if [[ -z "${CI-}" ]]; then
@@ -73,11 +78,13 @@ main() {
 	"test")
 		echo ">>> Running tests"
 		cargo test -- --show-output "$@"
+		cleanup_profraw_files
 		;;
 	"coverage")
 		echo ">>> Running tests with coverage"
 		cargo tarpaulin --out html --skip-clean -- --show-output "$@"
 		echo "open file ./tarpaulin-report.html to see coverage report"
+		cleanup_profraw_files
 		;;
 	"install-deps")
 		$0 install-diesel
