@@ -102,20 +102,24 @@ pub async fn search_bookmarks(
             .filter(bookmarks::dsl::deleted_at.is_null())
             .into_boxed();
 
-        // FIXME: use a better way to create a false condition, or divide paths into two parts, head and rest.
-        let always_false = Box::new(folders::id.eq(-1));
+        macro_rules! filter_folder_and_descendants {
+            ($path: expr) => {
+                folders::dsl::path
+                    .eq($path)
+                    .or(folders::dsl::path.like(format!("{}/%", $path)))
+            };
+        }
+
+        let mut iter = paths.iter();
+        let init = Box::new(filter_folder_and_descendants!(iter.next().unwrap()));
         let condition: Box<
             dyn BoxableExpression<
                 InnerJoinQuerySource<bookmarks::table, folders::table>,
                 _,
                 SqlType = Bool,
             >,
-        > = paths.iter().fold(always_false, |acc, path| {
-            // match path exactly or match descendants
-            Box::new(
-                acc.or(folders::dsl::path.eq(path))
-                    .or(folders::dsl::path.like(format!("{}/%", path))),
-            )
+        > = iter.fold(init, |acc, path| {
+            Box::new(acc.or(filter_folder_and_descendants!(path)))
         });
         query = query.filter(condition);
 
