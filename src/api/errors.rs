@@ -11,10 +11,8 @@ pub enum Error {
 impl From<DatabaseError> for Error {
     fn from(e: DatabaseError) -> Self {
         match e {
-            DatabaseError::DuplicationError { table } => Error::BadRequest(format!(
-                "Duplicate key value violates unique constraint of {}",
-                table
-            )),
+            DatabaseError::DuplicationError { table: _ } => Error::BadRequest(e.to_string()),
+            DatabaseError::ViolationError() => Error::BadRequest(e.to_string()),
         }
     }
 }

@@ -4,6 +4,8 @@ use thiserror::Error;
 pub enum DatabaseError {
     #[error("duplicate key value violates unique constraint of {table:?}")]
     DuplicationError { table: String },
+    #[error("foreign key constraint violation")]
+    ViolationError(),
 }
 
 #[derive(Error, Debug)]
