@@ -1,8 +1,7 @@
-use crate::db::tag;
+use crate::db::tag::{self, Tag};
 
 use super::fairings::db::Db;
 
-use itertools::Itertools;
 use rocket::serde::json::Json;
 use rocket_db_pools::Connection;
 
@@ -12,7 +11,7 @@ pub async fn search_tags(
     q: Option<&str>,
     before: Option<i32>,
     limit: Option<i64>,
-) -> Json<Vec<String>> {
+) -> Json<Vec<Tag>> {
     let keywords = q.map(|q| vec![q.trim()]).unwrap_or_default();
     Json(
         tag::search_tags(
@@ -23,8 +22,7 @@ pub async fn search_tags(
         )
         .await
         .into_iter()
-        .map(|t| t.name)
-        .collect_vec(),
+        .collect(),
     )
 }
 
