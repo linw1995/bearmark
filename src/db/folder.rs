@@ -103,11 +103,12 @@ pub async fn search_bookmarks(
             .into_boxed();
 
         macro_rules! filter_folder_and_descendants {
-            ($path: expr) => {
+            ($path: expr) => {{
+                let v = $path;
                 folders::dsl::path
-                    .eq($path)
-                    .or(folders::dsl::path.like(format!("{}/%", $path)))
-            };
+                    .eq(v)
+                    .or(folders::dsl::path.like(format!("{}/%", v)))
+            }};
         }
 
         let mut iter = paths.iter();
