@@ -53,3 +53,6 @@ serial_test = { version = "3.1.1", features = ["file_locks"] }
 [[bin]]
 name = "serve"
 path = "src/bin/serve.rs"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
