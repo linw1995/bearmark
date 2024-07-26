@@ -34,6 +34,13 @@ pub struct NewTag {
     pub name: String,
 }
 
+#[derive(AsChangeset, Deserialize, Serialize, Debug)]
+#[serde(crate = "rocket::serde")]
+#[diesel(table_name = tags)]
+pub struct ModifyTag {
+    pub name: Option<String>,
+}
+
 pub async fn get_tags(conn: &mut Connection, tags: &Vec<String>) -> Vec<Tag> {
     tags::table
         .filter(tags::name.eq_any(tags))
@@ -186,6 +193,29 @@ pub async fn search_bookmarks(
     let bs_ts = get_tags_per_bookmark(conn, bs).await;
     debug!(?bs_ts, "bookmarks with tags");
     bs_ts
+}
+
+pub async fn delete_tags(conn: &mut Connection, ids: Vec<i32>) -> usize {
+    if ids.is_empty() {
+        return 0;
+    }
+    diesel::delete(tags::table)
+        .filter(tags::dsl::id.eq_any(ids))
+        .execute(conn)
+        .await
+        .expect("Error deleting tags")
+}
+
+pub async fn update_tag(conn: &mut Connection, id: i32, modified: ModifyTag) -> Option<Tag> {
+    use diesel::{dsl::now, ExpressionMethods};
+
+    diesel::update(tags::table.find(id))
+        .set((&modified, tags::updated_at.eq(now)))
+        .returning(Tag::as_returning())
+        .get_result(conn)
+        .await
+        .optional()
+        .expect("Error updating tag")
 }
 
 #[cfg(test)]
