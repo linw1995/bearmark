@@ -132,7 +132,7 @@ pub struct ModifyBookmark {
     pub tags: Option<Vec<String>>,
 }
 
-#[put("/<id>", format = "application/json", data = "<payload>")]
+#[patch("/<id>", format = "application/json", data = "<payload>")]
 pub async fn update_bookmark(
     mut db: Connection<Db>,
     id: i32,
@@ -429,7 +429,7 @@ mod tests {
         assert_ne!(Some(added.url), payload.url);
 
         let response = client
-            .put(format!("/{}", added.id))
+            .patch(format!("/{}", added.id))
             .json(&payload)
             .dispatch();
         assert_eq!(response.status(), Status::Ok);
@@ -475,7 +475,7 @@ mod tests {
             tags: None,
         };
         let response = client
-            .put(format!("/{}", added.id))
+            .patch(format!("/{}", added.id))
             .json(&payload)
             .dispatch();
         assert_eq!(response.status(), Status::BadRequest);
@@ -511,7 +511,7 @@ mod tests {
         };
 
         let response = client
-            .put(format!("/{}", added.id))
+            .patch(format!("/{}", added.id))
             .json(&payload)
             .dispatch();
         assert_eq!(response.status(), Status::Ok);
