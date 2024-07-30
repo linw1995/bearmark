@@ -20,9 +20,7 @@ pub async fn search_tags(
             before.unwrap_or_default(),
             limit.unwrap_or(10),
         )
-        .await
-        .into_iter()
-        .collect(),
+        .await,
     )
 }
 

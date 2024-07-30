@@ -8,3 +8,6 @@ pub mod tag;
 
 // Driver
 pub mod connection;
+
+// Extensions
+pub mod extending;

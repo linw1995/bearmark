@@ -83,6 +83,17 @@ pub async fn move_out_bookmarks(conn: &mut Connection, bookmark_ids: &Vec<i32>) 
         .expect("Error moving out bookmarks");
 }
 
+pub async fn list_folders(conn: &mut Connection, cwd: &str) -> Vec<Folder> {
+    use super::extending::RegexMatchExtensions;
+
+    folders::table
+        .select(Folder::as_select())
+        .filter(folders::dsl::path.regex_match(format!("^{}/[^/]*$", cwd.trim_end_matches('/'))))
+        .load::<Folder>(conn)
+        .await
+        .expect("Error loading folders")
+}
+
 pub async fn search_bookmarks(
     conn: &mut Connection,
     keywords: &Vec<&str>,

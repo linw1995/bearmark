@@ -2,7 +2,7 @@
 extern crate rocket;
 
 use bmm::api::fairings::db::Db;
-use bmm::api::{bookmark, tag};
+use bmm::api::{bookmark, folder, tag};
 
 use rocket_db_pools::Database;
 
@@ -16,4 +16,5 @@ async fn rocket() -> _ {
         .attach(Db::init())
         .mount("/bookmarks", bookmark::routes())
         .mount("/tags", tag::routes())
+        .mount("/folders", folder::routes())
 }
