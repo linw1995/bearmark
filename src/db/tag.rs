@@ -1,9 +1,8 @@
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection as Connection, RunQueryDsl};
 use rocket::serde::{Deserialize, Serialize};
-use tracing::debug;
 
-use super::bookmark::{self, Bookmark};
+use super::bookmark::Bookmark;
 use super::schema::{bookmarks_tags, tags};
 
 #[derive(Queryable, Selectable, Identifiable, Debug, Deserialize, Serialize)]
@@ -92,27 +91,6 @@ pub async fn update_bookmark_tags(conn: &mut Connection, bookmark: &Bookmark, ta
         .expect("Error updating bookmark tags");
 }
 
-pub async fn get_tags_per_bookmark(
-    conn: &mut Connection,
-    bookmarks: Vec<Bookmark>,
-) -> Vec<(Bookmark, Vec<Tag>)> {
-    let tags = BookmarkTag::belonging_to(&bookmarks)
-        .inner_join(tags::table)
-        .select((BookmarkTag::as_select(), Tag::as_select()))
-        .order_by((
-            bookmarks_tags::dsl::bookmark_id.desc(),
-            tags::dsl::name.asc(),
-        ))
-        .load(conn)
-        .await
-        .expect("Error loading tags");
-    tags.grouped_by(&bookmarks)
-        .into_iter()
-        .zip(bookmarks)
-        .map(|(tags, bookmark)| (bookmark, tags.into_iter().map(|(_, tag)| tag).collect()))
-        .collect()
-}
-
 pub async fn search_tags(
     conn: &mut Connection,
     keywords: &Vec<&str>,
@@ -135,64 +113,6 @@ pub async fn search_tags(
         .load(conn)
         .await
         .expect("Error loading tags")
-}
-
-pub async fn search_bookmarks(
-    conn: &mut Connection,
-    keywords: &Vec<&str>,
-    tags: &Vec<&str>,
-    before: i32,
-    limit: i64,
-) -> Vec<(Bookmark, Vec<Tag>)> {
-    let bs = if tags.is_empty() {
-        bookmark::search_bookmarks(conn, keywords, before, limit).await
-    } else {
-        use super::schema::{self, bookmarks, bookmarks_tags};
-
-        let mut query = bookmarks_tags::table
-            .inner_join(bookmarks::table)
-            .inner_join(schema::tags::table)
-            .select(Bookmark::as_select())
-            .distinct_on(bookmarks::id)
-            .filter(bookmarks::dsl::deleted_at.is_null())
-            .into_boxed();
-
-        for tag in tags {
-            if tag.is_empty() {
-                continue;
-            }
-            query = query.filter(tags::dsl::name.ilike(format!("%{}%", tag)));
-        }
-
-        for keyword in keywords {
-            if keyword.is_empty() {
-                continue;
-            }
-            query = query.filter(
-                bookmarks::dsl::title
-                    .ilike(format!("%{}%", keyword))
-                    .or(bookmarks::dsl::url.ilike(format!("%{}%", keyword))),
-            )
-        }
-
-        if before > 0 {
-            query = query.filter(bookmarks::dsl::id.lt(before))
-        }
-
-        query
-            .order_by(bookmarks::dsl::id.desc())
-            .limit(limit)
-            .load::<Bookmark>(conn)
-            .await
-            .expect("Error loading bookmarks")
-    };
-
-    debug!(?bs, "bookmarks without tags");
-
-    // Group bookmark and tags
-    let bs_ts = get_tags_per_bookmark(conn, bs).await;
-    debug!(?bs_ts, "bookmarks with tags");
-    bs_ts
 }
 
 pub async fn delete_tags(conn: &mut Connection, ids: Vec<i32>) -> usize {
@@ -220,15 +140,35 @@ pub async fn update_tag(conn: &mut Connection, id: i32, modified: ModifyTag) -> 
 
 #[cfg(test)]
 pub mod tests {
-    use super::super::bookmark::{self, tests::rand_bookmark};
+    use super::super::bookmark::{self, test::rand_bookmark};
     use super::super::connection;
     use super::*;
-    use crate::db::bookmark::NewBookmark;
-    use crate::db::schema::bookmarks;
+
     use crate::utils::rand::rand_str;
 
     use itertools::Itertools;
     use tracing::info;
+
+    async fn get_tags_per_bookmark(
+        conn: &mut Connection,
+        bookmarks: Vec<Bookmark>,
+    ) -> Vec<(Bookmark, Vec<Tag>)> {
+        let tags = BookmarkTag::belonging_to(&bookmarks)
+            .inner_join(tags::table)
+            .select((BookmarkTag::as_select(), Tag::as_select()))
+            .order_by((
+                bookmarks_tags::dsl::bookmark_id.desc(),
+                tags::dsl::name.asc(),
+            ))
+            .load(conn)
+            .await
+            .expect("Error loading tags");
+        tags.grouped_by(&bookmarks)
+            .into_iter()
+            .zip(bookmarks)
+            .map(|(tags, bookmark)| (bookmark, tags.into_iter().map(|(_, tag)| tag).collect()))
+            .collect()
+    }
 
     #[tokio::test]
     async fn test_get_or_create_tags() {
@@ -288,107 +228,6 @@ pub mod tests {
                 .collect_vec(),
             tag_names
         );
-    }
-
-    pub async fn setup_searchable_bookmarks(conn: &mut Connection) {
-        let values = vec![
-            (
-                NewBookmark {
-                    title: "Weather".to_string(),
-                    url: "https://weather.com".to_string(),
-                },
-                vec!["weather", "forecast"],
-            ),
-            (
-                NewBookmark {
-                    title: "News".to_string(),
-                    url: "https://news.com".to_string(),
-                },
-                vec!["news", "world"],
-            ),
-            (
-                NewBookmark {
-                    title: "Sports".to_string(),
-                    url: "https://sports.com".to_string(),
-                },
-                vec!["sports", "football"],
-            ),
-            (
-                NewBookmark {
-                    title: "Tech".to_string(),
-                    url: "https://tech.com".to_string(),
-                },
-                vec!["tech", "gadgets"],
-            ),
-            (
-                NewBookmark {
-                    title: "Weather Global".to_string(),
-                    url: "https://example.com".to_string(),
-                },
-                vec!["weather", "global"],
-            ),
-            (
-                NewBookmark {
-                    title: "Weather West".to_string(),
-                    url: "https://example.com".to_string(),
-                },
-                vec!["weather", "west"],
-            ),
-        ];
-
-        // delete bookmarks with same title
-        let titles = values
-            .iter()
-            .map(|(b, _)| b.title.clone())
-            .collect::<Vec<_>>();
-        diesel::delete(bookmarks::table)
-            .filter(bookmarks::title.eq_any(titles))
-            .execute(conn)
-            .await
-            .expect("Error deleting bookmarks");
-
-        for (bookmark, tags) in values {
-            let bookmark = bookmark::create_bookmark(conn, bookmark).await;
-            let tags = tags.iter().map(|t| t.to_string()).collect_vec();
-            update_bookmark_tags(conn, &bookmark, &tags).await;
-        }
-    }
-
-    #[tokio::test]
-    #[file_serial] // For allowing remove data of table in test
-    async fn test_search_bookmarks() {
-        let mut conn = connection::establish().await;
-        setup_searchable_bookmarks(&mut conn).await;
-
-        let bookmarks = search_bookmarks(&mut conn, &vec!["Weather"], &vec![], 0, 10).await;
-        info!(?bookmarks, "searched bookmarks");
-        assert_eq!(bookmarks.len(), 3);
-
-        let bookmarks = search_bookmarks(&mut conn, &vec!["Weather"], &vec!["global"], 0, 10).await;
-        info!(?bookmarks, "searched bookmarks with tags");
-        assert_eq!(bookmarks.len(), 1);
-
-        let bookmarks = search_bookmarks(&mut conn, &vec!["Weather"], &vec!["west"], 0, 10).await;
-        info!(?bookmarks, "searched bookmarks with tags");
-        assert_eq!(bookmarks.len(), 1);
-
-        let bookmarks =
-            search_bookmarks(&mut conn, &vec!["Weather"], &vec!["global", "west"], 0, 10).await;
-        info!(?bookmarks, "searched bookmarks with tags");
-        assert_eq!(bookmarks.len(), 0);
-
-        let bookmarks = search_bookmarks(&mut conn, &vec![], &vec!["weather"], 0, 10).await;
-        info!(?bookmarks, "searched bookmarks with tags");
-        assert_eq!(bookmarks.len(), 3);
-
-        let bookmarks = search_bookmarks(&mut conn, &vec![], &vec!["weather"], 0, 1).await;
-        info!(?bookmarks, "searched bookmarks with tags");
-        assert_eq!(bookmarks.len(), 1);
-
-        let bookmarks =
-            search_bookmarks(&mut conn, &vec![], &vec!["weather"], bookmarks[0].0.id, 3).await;
-        info!(?bookmarks, "searched bookmarks with tags");
-        assert_eq!(bookmarks.len(), 2);
     }
 
     #[tokio::test]

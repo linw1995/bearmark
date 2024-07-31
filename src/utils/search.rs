@@ -1,24 +1,22 @@
-use itertools::Itertools;
 use pratt_gen::*;
 use serde::Serializer;
-use std::fmt::Debug;
-use tracing::warn;
-
-use super::BearQLError;
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, Clone, Copy, ParserImpl, Space)]
 pub enum Query<'a> {
-    #[parse("{0} {1}")]
-    And(Primitive<'a>, &'a Query<'a>),
+    #[parse("{0:2} | {1:1}", precedence = 2)]
+    Or(&'a Self, &'a Self),
+    #[parse("{0:4} {1:3}", precedence = 4)]
+    And(&'a Self, &'a Self),
+    #[parse("({0})")]
+    Parenthesized(&'a Self),
     #[parse("{0}")]
     Primitive(Primitive<'a>),
-    #[parse("")]
-    Null(),
 }
 
 #[derive(Debug, Clone, Copy, ParserImpl, Space)]
 pub enum Primitive<'a> {
-    #[parse("/{0}")]
+    #[parse("{0}")]
     Path(Path<'a>),
     #[parse("#{0}")]
     Tag(Tag<'a>),
@@ -26,16 +24,26 @@ pub enum Primitive<'a> {
     Keyword(Keyword<'a>),
 }
 
-#[derive(Clone, Copy, ParserImpl, Space)]
+#[derive(Debug, Clone, Copy, ParserImpl, Space)]
 pub enum Path<'a> {
+    #[parse("./{0}")]
+    Relative(&'a RelativePath<'a>),
+    #[parse("/{0}")]
+    Absolute(&'a RelativePath<'a>),
+    #[parse("/")]
+    Root(),
+    #[parse("./")]
+    CWD(),
+}
+
+#[derive(Debug, Clone, Copy, ParserImpl, Space)]
+pub enum RelativePath<'a> {
     #[parse("{0}/{1}")]
-    Join(Keyword<'a>, &'a Path<'a>),
+    Join(Keyword<'a>, &'a Self),
     #[parse("{0}")]
     Name(Keyword<'a>),
-    #[parse("/")] // for "//" syntax
-    JoinJoin(),
-    #[parse("")]
-    Empty(),
+    #[parse("/")] // for tailing "/", "//" ... syntax
+    ExtraSlash(),
 }
 
 #[derive(Debug, Clone, Copy, ParserImpl, Space)]
@@ -63,12 +71,6 @@ impl<'a> Debug for Keyword<'a> {
     }
 }
 
-impl<'a> Debug for Path<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.serialize_str(format!("/{}", self.into_iter().join("/")).as_str())
-    }
-}
-
 impl<'a> From<Keyword<'a>> for &'a str {
     fn from(k: Keyword<'a>) -> &'a str {
         match k {
@@ -87,40 +89,20 @@ impl<'a> From<Tag<'a>> for &'a str {
     }
 }
 
-impl<'a> Iterator for Query<'a> {
-    type Item = Primitive<'a>;
-    fn next(&mut self) -> Option<Self::Item> {
-        match *self {
-            Self::And(item, that) => {
-                *self = *that;
-                Some(item)
-            }
-            Self::Primitive(item) => {
-                *self = Self::Null();
-                Some(item)
-            }
-            Self::Null() => None,
+impl Display for Keyword<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Keyword::Quoted(s) => write!(f, "\"{}\"", s),
+            Keyword::Unquoted(s) => write!(f, "{}", s.0),
         }
     }
 }
 
-impl<'a> Iterator for Path<'a> {
-    type Item = &'a str;
-    fn next(&mut self) -> Option<Self::Item> {
-        match *self {
-            Self::Join(item, that) => {
-                *self = *that;
-                Some(item.into())
-            }
-            Self::JoinJoin() => {
-                *self = Self::Empty();
-                Some("/")
-            }
-            Self::Name(item) => {
-                *self = Self::Empty();
-                Some(item.into())
-            }
-            Self::Empty() => None,
+impl Display for Tag<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Tag::Keyword(k) => write!(f, "#{}", k),
+            Tag::Null() => Ok(()),
         }
     }
 }
@@ -132,43 +114,51 @@ pub struct QueryResult<'a> {
     pub paths: Vec<&'a str>,
 }
 
-fn path_to_str<'a>(p: Path<'a>, arena: &'a Arena) -> &'a str {
-    unsafe { arena.alloc_str(&p.into_iter().join("/")) }
+fn _path_to_str_parts<'a>(p: Path<'a>, parts: &mut Vec<&'a str>) {
+    let mut cur = match p {
+        Path::Root() => {
+            parts.push("");
+            parts.push("");
+            return;
+        }
+        Path::Absolute(p) => {
+            parts.push("");
+            *p
+        }
+        Path::Relative(p) => {
+            parts.push(".");
+            *p
+        }
+        Path::CWD() => {
+            parts.push(".");
+            parts.push("");
+            return;
+        }
+    };
+    while match cur {
+        RelativePath::Join(item, that) => {
+            parts.push(item.into());
+            cur = *that;
+            true
+        }
+        RelativePath::Name(item) => {
+            parts.push(item.into());
+            false
+        }
+        RelativePath::ExtraSlash() => {
+            parts.push("");
+            parts.push("");
+            false
+        }
+    } {}
 }
 
-pub fn parse_query<'a>(
-    raw: &'a str,
-    out_arena: &'a Arena,
-    err_arena: &'a Arena,
-) -> Result<QueryResult<'a>, BearQLError> {
-    let source = Source::new(raw);
-    let rv = parse::<Query>(source, out_arena, err_arena).map_err(|e| {
-        warn!(?raw, ?e, "failed to parse query");
-        BearQLError::SyntaxError {
-            msg: "failed to parse query".to_string(),
-            ql: raw.to_string(),
-            err_msg: format!("{:?}", e),
-        }
-    })?;
-    let rv = rv.collect::<Vec<Primitive>>();
-
-    let mut tags = vec![];
-    let mut keywords = vec![];
-    let mut paths = vec![];
-
-    for primitive in rv {
-        match primitive {
-            Primitive::Tag(tag) => tags.push(tag.into()),
-            Primitive::Keyword(keyword) => keywords.push(keyword.into()),
-            Primitive::Path(path) => paths.push(path_to_str(path, out_arena)),
-        }
+impl Display for Path<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut parts = vec![];
+        _path_to_str_parts(*self, &mut parts);
+        write!(f, "{}", parts.join("/"))
     }
-
-    Ok(QueryResult {
-        tags,
-        keywords,
-        paths,
-    })
 }
 
 #[cfg(test)]
@@ -176,79 +166,16 @@ mod test {
     use super::*;
     use tracing::{debug, info};
 
-    fn to_str_vec<'a>(primitives: Vec<Primitive<'a>>, arena: &'a Arena) -> Vec<&'a str> {
-        primitives
-            .into_iter()
-            .map(|x| match x {
-                Primitive::Path(path) => path_to_str(path, &arena),
-                Primitive::Tag(tag) => tag.into(),
-                Primitive::Keyword(keyword) => keyword.into(),
-            })
-            .collect()
-    }
-
-    fn parse_query<'a>(
-        raw: &'a str,
-        out_arena: &'a Arena,
-        err_arena: &'a Arena,
-    ) -> Vec<Primitive<'a>> {
+    fn parse_query<'a>(raw: &'a str, out_arena: &'a Arena, err_arena: &'a Arena) -> Query<'a> {
         let source = Source::new(raw);
         let rv = parse::<Query>(source, &out_arena, &err_arena);
-        debug!(?rv, "parsed");
+        debug!(?rv, ?source, "parsed");
         assert!(rv.is_ok());
-        let rv = rv.unwrap().collect::<Vec<Primitive>>();
-        debug!(?rv, "collect into vec");
-        rv
+        rv.unwrap()
     }
 
     #[test]
-    fn query_with_tags() {
-        let out_arena = Arena::new();
-        let err_arena = Arena::new();
-
-        for (raw, expect_tags, expect_keywords) in vec![
-            ("", vec![], vec![]),
-            (r#"rust"#, vec![], vec!["rust"]),
-            (r#""rust pl""#, vec![], vec!["rust pl"]),
-            (r#"#rust"#, vec!["rust"], vec![]),
-            (r#"#"#, vec![""], vec![]),
-            (r#"# title"#, vec![""], vec!["title"]),
-            (r#"#"special tag""#, vec!["special tag"], vec![]),
-            (
-                r#"#rust #pl title "my title" #"I'm" "#,
-                vec!["rust", "pl", "I'm"],
-                vec!["title", "my title"],
-            ),
-        ] {
-            info!(?raw, ?expect_tags, ?expect_keywords, "testing query");
-            let rv = parse_query(raw, &out_arena, &err_arena);
-
-            let (tags, keywords) = rv.into_iter().partition(|x| matches!(x, Primitive::Tag(_)));
-            let tags = to_str_vec(tags, &out_arena);
-            let keywords = to_str_vec(keywords, &out_arena);
-            debug!(?tags, ?keywords, "the query conditions for where clause");
-
-            assert_eq!(tags, expect_tags);
-            assert_eq!(keywords, expect_keywords);
-        }
-    }
-
-    #[test]
-    fn query_in_unusually_path() {
-        let out_arena = Arena::new();
-        let err_arena = Arena::new();
-
-        let rv = parse_query(r#"// title #rust "#, &out_arena, &err_arena);
-        assert_eq!(rv.len(), 3);
-        assert!(matches!(rv[0], Primitive::Path(Path::JoinJoin())));
-
-        let rv = parse_query(r#"/ title #rust "#, &out_arena, &err_arena);
-        assert_eq!(rv.len(), 3);
-        assert!(matches!(rv[0], Primitive::Path(Path::Empty())));
-    }
-
-    #[test]
-    fn query_in_path() {
+    fn test_parsing() {
         let out_arena = Arena::new();
         let err_arena = Arena::new();
 
@@ -256,9 +183,13 @@ mod test {
             r#"/cs/pl/rust title #rust"#,
             r#"/cs/pl title #rust"#,
             r#"/cs title #rust"#,
+            r#"title | #rust"#,
+            r#"title | #rust #langs"#,
+            r#"title ( #rust  #langs )"#,
+            r#"title ( #rust | #langs )"#,
         ] {
-            let _rv = parse_query(&src, &out_arena, &err_arena);
-            // TODO: assert_eq!(rv, expect);
+            let rv = parse_query(&src, &out_arena, &err_arena);
+            info!(?rv, ?src, "parsed");
         }
     }
 }

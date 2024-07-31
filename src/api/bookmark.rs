@@ -1,7 +1,6 @@
 use super::errors::Error;
 use super::fairings::db::Db;
-use crate::db::{bookmark, tag};
-use crate::utils::{search, BearQLError};
+use crate::db::{self, bookmark, tag};
 
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
@@ -12,6 +11,7 @@ use tracing::debug;
 pub struct CreateBookmarkPayload {
     title: String,
     url: String,
+    folder_id: Option<i32>, // TODO: implement create with folder
     tags: Vec<String>,
 }
 
@@ -20,6 +20,7 @@ pub struct Bookmark {
     id: i32,
     title: String,
     url: String,
+    folder: Option<String>,
     tags: Vec<String>,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: time::OffsetDateTime,
@@ -48,6 +49,7 @@ pub async fn create_bookmark(
         id: m.id,
         title: m.title,
         url: m.url,
+        folder: None,
         tags,
         created_at: m.created_at,
         updated_at: m.updated_at,
@@ -55,57 +57,31 @@ pub async fn create_bookmark(
     })
 }
 
-#[get("/?<q>&<before>&<limit>")]
+#[get("/?<q>&<cwd>&<before>&<limit>")]
 pub async fn search_bookmarks(
     mut db: Connection<Db>,
     q: Option<&str>,
+    cwd: Option<&str>,
     before: Option<i32>,
     limit: Option<i64>,
 ) -> Result<Json<Vec<Bookmark>>, Error> {
-    use pratt_gen::Arena;
-
-    let rv = if let Some(q) = q {
-        let out_arena = Arena::new();
-        let err_arena = Arena::new();
-        let rv = search::parse_query(q, &out_arena, &err_arena)?;
-        debug!(?rv, "the query conditions for where clause");
-
-        // check if it has empty keyword
-        if rv.keywords.iter().any(|f| f.trim().is_empty()) {
-            return Err(BearQLError::EmptyKeyword.into());
-        }
-        // check if it has empty tag
-        if rv.tags.iter().any(|f| f.trim().is_empty()) {
-            return Err(BearQLError::EmptyTag.into());
-        }
-
-        tag::search_bookmarks(
-            &mut db,
-            &rv.keywords,
-            &rv.tags,
-            before.unwrap_or_default(),
-            limit.unwrap_or(10),
-        )
-        .await
-    } else {
-        tag::search_bookmarks(
-            &mut db,
-            &vec![],
-            &vec![],
-            before.unwrap_or_default(),
-            limit.unwrap_or(10),
-        )
-        .await
-    };
-
+    let rv = crate::db::search_bookmarks(
+        &mut db,
+        q,
+        cwd,
+        before.unwrap_or_default(),
+        limit.unwrap_or(10),
+    )
+    .await?;
     debug!(?rv, "search results");
 
     Ok(Json(
         rv.into_iter()
-            .map(|(m, tags)| Bookmark {
+            .map(|(m, folder, tags)| Bookmark {
                 id: m.id,
                 title: m.title,
                 url: m.url,
+                folder: folder.map(|f| f.path),
                 tags: tags.into_iter().map(|t| t.name).collect(),
                 created_at: m.created_at,
                 updated_at: m.updated_at,
@@ -165,12 +141,13 @@ pub async fn update_bookmark(
         tag::update_bookmark_tags(&mut db, &m, &payload).await;
     }
 
-    let rv = tag::get_tags_per_bookmark(&mut db, vec![m.clone()]).await;
-    if let Some((m, tags)) = rv.first() {
+    let rv = db::get_bookmark_details(&mut db, vec![m.clone()]).await;
+    if let Some((m, folder, tags)) = rv.first() {
         return Ok(Json(Bookmark {
             id: m.id,
             title: m.title.clone(),
             url: m.url.clone(),
+            folder: folder.clone().map(|f| f.path),
             tags: tags.iter().map(|t| t.name.clone()).collect(),
             created_at: m.created_at,
             updated_at: m.updated_at,
@@ -182,6 +159,7 @@ pub async fn update_bookmark(
         id: m.id,
         title: m.title,
         url: m.url,
+        folder: None,
         tags: vec![],
         created_at: m.created_at,
         updated_at: m.updated_at,
@@ -199,11 +177,10 @@ pub fn routes() -> Vec<rocket::Route> {
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::utils;
-
+mod test {
     use super::*;
-    use bookmark::tests::rand_bookmark;
+    use crate::db::bookmark::test::rand_bookmark;
+    use crate::utils;
 
     use itertools::Itertools;
     use rocket::http::Status;
@@ -223,6 +200,7 @@ mod tests {
         let payload = CreateBookmarkPayload {
             url: "https://www.rust-lang.org".to_string(),
             title: "Rust".to_string(),
+            folder_id: None,
             tags: vec!["rust".to_string(), "programming".to_string()],
         };
         let response = client
@@ -243,6 +221,7 @@ mod tests {
         let payload = CreateBookmarkPayload {
             url: "https://www.rust-lang.org".to_string(),
             title: "Rust".to_string(),
+            folder_id: None,
             tags: vec!["rust".to_string(), "programming".to_string()],
         };
         let response = client
@@ -266,7 +245,7 @@ mod tests {
 
         // Create some bookmarks
         let mut conn = crate::db::connection::establish().await;
-        crate::db::tag::tests::setup_searchable_bookmarks(&mut conn).await;
+        crate::db::search::test::setup_searchable_bookmarks(&mut conn).await;
 
         let app = rocket::build().attach(Db::init()).mount("/", routes());
         let client = Client::tracked(app).await.expect("valid rocket instance");
@@ -358,10 +337,11 @@ mod tests {
 
     #[test]
     fn unsearchable_deleted_bookmark() {
-        let payload = crate::db::bookmark::tests::rand_bookmark();
+        let payload = rand_bookmark();
         let payload = CreateBookmarkPayload {
             url: payload.url,
             title: payload.title,
+            folder_id: None,
             tags: vec!["rust".to_string(), "programming".to_string()],
         };
         info!(?payload, "creating");
@@ -411,6 +391,7 @@ mod tests {
         let payload = CreateBookmarkPayload {
             url: m.url,
             title: m.title,
+            folder_id: None,
             tags: vec!["rust".to_string(), "programming".to_string()],
         };
         let response = client
@@ -460,6 +441,7 @@ mod tests {
         let payload = CreateBookmarkPayload {
             url: m.url,
             title: m.title,
+            folder_id: None,
             tags: vec!["rust".to_string(), "programming".to_string()],
         };
         let response = client
@@ -488,6 +470,7 @@ mod tests {
         let payload = CreateBookmarkPayload {
             url: m.url,
             title: m.title,
+            folder_id: None,
             tags: vec!["rust", "programming"]
                 .into_iter()
                 .map(|s| s.to_string())

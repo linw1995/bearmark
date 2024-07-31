@@ -11,3 +11,8 @@ pub mod connection;
 
 // Extensions
 pub mod extending;
+
+// Utilities
+pub(crate) mod search;
+
+pub use search::{get_bookmark_details, search_bookmarks};

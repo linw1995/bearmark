@@ -59,39 +59,6 @@ impl Bookmark {
     }
 }
 
-pub async fn search_bookmarks(
-    conn: &mut Connection,
-    keywords: &Vec<&str>,
-    before: i32,
-    limit: i64,
-) -> Vec<Bookmark> {
-    // Cursor-based pagination
-    // before: id of the last bookmark in the previous page. 0 for the first page.
-
-    let mut query = bookmarks::table
-        .filter(bookmarks::dsl::deleted_at.is_null())
-        .into_boxed();
-
-    for keyword in keywords {
-        query = query.filter(
-            bookmarks::dsl::title
-                .ilike(format!("%{}%", keyword))
-                .or(bookmarks::dsl::url.ilike(format!("%{}%", keyword))),
-        )
-    }
-
-    if before > 0 {
-        query = query.filter(bookmarks::dsl::id.lt(before))
-    }
-
-    query
-        .order_by(bookmarks::dsl::id.desc())
-        .limit(limit)
-        .load::<Bookmark>(conn)
-        .await
-        .expect("Error search bookmarks")
-}
-
 pub async fn create_bookmark(conn: &mut Connection, new_bookmark: NewBookmark) -> Bookmark {
     diesel::insert_into(bookmarks::table)
         .values(&new_bookmark)
@@ -130,7 +97,7 @@ pub async fn delete_bookmarks(conn: &mut Connection, ids: Vec<i32>) -> usize {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+pub(crate) mod test {
     use super::super::connection;
     use super::*;
     use crate::utils;
@@ -185,105 +152,6 @@ pub(crate) mod tests {
 
         let m = Bookmark::get(&mut conn, m.id).await.unwrap();
         assert!(m.deleted_at.is_some());
-    }
-
-    pub async fn setup_searchable_bookmarks(conn: &mut Connection) {
-        let values = vec![
-            NewBookmark {
-                title: "Weather".to_string(),
-                url: "https://example.com".to_string(),
-            },
-            NewBookmark {
-                title: "News".to_string(),
-                url: "https://example.com".to_string(),
-            },
-            NewBookmark {
-                title: "Social".to_string(),
-                url: "https://example.com".to_string(),
-            },
-            NewBookmark {
-                title: "Weather Global".to_string(),
-                url: "https://example.com".to_string(),
-            },
-            NewBookmark {
-                title: "Weather West".to_string(),
-                url: "https://example.com".to_string(),
-            },
-        ];
-
-        // delete bookmarks with same title
-        let titles = values
-            .iter()
-            .map(|v| v.title.clone())
-            .collect::<Vec<String>>();
-        diesel::delete(bookmarks::table)
-            .filter(bookmarks::title.eq_any(titles))
-            .execute(conn)
-            .await
-            .expect("Error deleting bookmarks");
-
-        diesel::insert_into(bookmarks::table)
-            .values(&values)
-            .execute(conn)
-            .await
-            .expect("Error saving new bookmarks");
-    }
-
-    #[tokio::test]
-    #[file_serial] // For allowing remove data of table in test
-    pub async fn search_bookmarks_with_pagination() {
-        let mut conn = connection::establish().await;
-        setup_searchable_bookmarks(&mut conn).await;
-
-        let results = search_bookmarks(&mut conn, &vec![], 0, 10).await;
-        assert!(
-            results.len() >= 5,
-            "Expected more than 5 bookmarks, got {}",
-            results.len()
-        );
-
-        let results = search_bookmarks(&mut conn, &vec!["Weather"], 0, 10).await;
-        assert!(
-            results.len() == 3,
-            "Expected 3 bookmarks, got {}",
-            results.len()
-        );
-
-        let results = search_bookmarks(&mut conn, &vec!["Weather"], 0, 2).await;
-        assert!(
-            results.len() == 2,
-            "Expected 2 bookmarks, got {}",
-            results.len()
-        );
-
-        let results = search_bookmarks(&mut conn, &vec!["Weather"], results[1].id, 2).await;
-        assert!(
-            results.len() == 1,
-            "Expected 1 bookmarks, got {}",
-            results.len()
-        );
-    }
-
-    #[tokio::test]
-    async fn unsearchable_deleted_bookmark() {
-        let mut conn = connection::establish().await;
-        let new_bookmark = rand_bookmark();
-        let title = new_bookmark.title.clone();
-        let m = create_bookmark(&mut conn, new_bookmark).await;
-        info!(?m, "created");
-        assert!(m.id > 0);
-        assert!(m.deleted_at.is_none());
-
-        let result = search_bookmarks(&mut conn, &vec![&title], 0, 1).await;
-        info!(?result, "searched");
-        assert!(result.len() == 1);
-
-        let count = delete_bookmarks(&mut conn, vec![m.id]).await;
-        assert!(count == 1);
-
-        let result = search_bookmarks(&mut conn, &vec![&title], 0, 1).await;
-        info!(?result, "searched");
-        assert!(result.len() == 0);
     }
 
     #[tokio::test]
