@@ -31,8 +31,15 @@ impl Pool for DBPool {
         // Map errors of type `GetError` to `Error<_, GetError>`.
         let mut conn = self.0.get().await.map_err(Error::Get)?;
 
-        conn.set_instrumentation(|event: InstrumentationEvent<'_>| {
-            tracing::debug!(?event);
+        conn.set_instrumentation(|event: InstrumentationEvent<'_>| match event {
+            InstrumentationEvent::StartQuery { query, .. } => {
+                tracing::debug!("Executing query: {}", query);
+            }
+            InstrumentationEvent::FinishQuery { query, error, .. } => match error {
+                Some(e) => tracing::error!("Query failed: {}\nError: {:?}", query, e),
+                None => tracing::debug!("Executing query succeeded: {}", query),
+            },
+            _ => {}
         });
 
         Ok(conn)
