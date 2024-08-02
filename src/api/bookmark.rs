@@ -1,6 +1,6 @@
 use super::errors::Error;
 use super::fairings::db::Db;
-use crate::db::{self, bookmark, tag};
+use crate::db::{self, bookmark, folder, tag};
 
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use tracing::debug;
 pub struct CreateBookmarkPayload {
     title: String,
     url: String,
-    folder_id: Option<i32>, // TODO: implement create with folder
+    folder_id: Option<i32>,
     tags: Vec<String>,
 }
 
@@ -34,7 +34,7 @@ pub struct Bookmark {
 pub async fn create_bookmark(
     mut db: Connection<Db>,
     payload: Json<CreateBookmarkPayload>,
-) -> Json<Bookmark> {
+) -> Result<Json<Bookmark>, Error> {
     let payload = payload.into_inner();
     let (new_bookmark, tags) = (
         bookmark::NewBookmark {
@@ -44,17 +44,26 @@ pub async fn create_bookmark(
         payload.tags,
     );
     let m = bookmark::create_bookmark(&mut db, new_bookmark).await;
+
     tag::update_bookmark_tags(&mut db, &m, &tags).await;
-    Json(Bookmark {
+
+    if let Some(folder_id) = payload.folder_id {
+        // TODO: transaction required?
+        folder::move_bookmarks(&mut db, folder_id, &vec![m.id]).await?;
+    }
+
+    let (m, f, ts) = db::get_bookmark_details(&mut db, vec![m]).await.remove(0);
+
+    Ok(Json(Bookmark {
         id: m.id,
         title: m.title,
         url: m.url,
-        folder: None,
-        tags,
+        folder: f.map(|f| f.path),
+        tags: ts.into_iter().map(|t| t.name).collect(),
         created_at: m.created_at,
         updated_at: m.updated_at,
         deleted_at: m.deleted_at,
-    })
+    }))
 }
 
 #[get("/?<q>&<cwd>&<before>&<limit>")]
