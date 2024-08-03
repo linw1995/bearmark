@@ -1,17 +1,23 @@
 use diesel::connection::InstrumentationEvent;
-use diesel_async::{pooled_connection::AsyncDieselConnectionManager, AsyncConnection};
+use diesel_async::{
+    pooled_connection::{
+        deadpool::{BuildError, Object, Pool, PoolError},
+        AsyncDieselConnectionManager,
+    },
+    AsyncConnection, AsyncPgConnection,
+};
 use dotenvy::dotenv;
 use rocket::figment::Figment;
-use rocket_db_pools::{Database, Error, Pool};
+use rocket_db_pools::{Database, Error};
 
-pub type InitError = diesel_async::pooled_connection::deadpool::BuildError;
-pub type GetError = diesel_async::pooled_connection::deadpool::PoolError;
-pub type Connection = diesel_async::AsyncPgConnection;
-pub struct DBPool(diesel_async::pooled_connection::deadpool::Pool<Connection>);
+pub type InitError = BuildError;
+pub type GetError = PoolError;
+pub type Connection = AsyncPgConnection;
+pub struct DBPool(Pool<Connection>);
 
 #[rocket::async_trait]
-impl Pool for DBPool {
-    type Connection = diesel_async::pooled_connection::deadpool::Object<Connection>;
+impl rocket_db_pools::Pool for DBPool {
+    type Connection = Object<Connection>;
 
     type Error = Error<InitError, GetError>;
 
@@ -20,7 +26,7 @@ impl Pool for DBPool {
 
         let url = std::env::var("DATABASE_URL").expect("env DATABASE_URL must be set");
         let config = AsyncDieselConnectionManager::<Connection>::new(url);
-        match diesel_async::pooled_connection::deadpool::Pool::builder(config).build() {
+        match Pool::builder(config).build() {
             Ok(pool) => Ok(Self(pool)),
             Err(e) => Err(Error::Init(e)),
         }
@@ -51,5 +57,5 @@ impl Pool for DBPool {
 }
 
 #[derive(Database)]
-#[database("diesel_mysql")]
+#[database("deadpool_diesel_postgres")]
 pub struct Db(DBPool);
