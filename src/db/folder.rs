@@ -23,6 +23,43 @@ pub struct NewFolder<'a> {
     pub path: &'a str,
 }
 
+impl Folder {
+    pub async fn get(conn: &mut Connection, id: i32) -> Option<Self> {
+        folders::table
+            .find(id)
+            .first(conn)
+            .await
+            .optional()
+            .expect("Error loading folder")
+    }
+
+    pub async fn get_by_path(conn: &mut Connection, path: &str) -> Option<Self> {
+        folders::table
+            .filter(folders::dsl::path.eq(path))
+            .first(conn)
+            .await
+            .optional()
+            .expect("Error loading folder")
+    }
+
+    pub async fn get_with_ancestors(conn: &mut Connection, path: &str) -> Vec<Option<Self>> {
+        let mut ancestors = Vec::new();
+        let mut path = path.trim_matches('/');
+        while !path.is_empty() {
+            ancestors.push(Self::get_by_path(conn, &format!("/{}", path)).await);
+            let mut split = path.rsplitn(2, '/');
+            // result is in reverse order, so nth(1) is the parent, nth(0) is the current
+            // and if nth(1) is None, then it's the root folder
+            if let Some(parent) = split.nth(1) {
+                path = parent;
+            } else {
+                break;
+            }
+        }
+        ancestors
+    }
+}
+
 pub async fn create_folder(conn: &mut Connection, path: &str) -> Result<Folder, DatabaseError> {
     diesel::insert_into(folders::table)
         .values(&NewFolder {
