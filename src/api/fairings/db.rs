@@ -39,7 +39,7 @@ impl rocket_db_pools::Pool for DBPool {
 
         conn.set_instrumentation(|event: InstrumentationEvent<'_>| match event {
             InstrumentationEvent::StartQuery { query, .. } => {
-                tracing::debug!("Executing query: {}", query);
+                tracing::info!("Executing query: {}", query);
             }
             InstrumentationEvent::FinishQuery { query, error, .. } => match error {
                 Some(e) => tracing::error!("Query failed: {}\nError: {:?}", query, e),
