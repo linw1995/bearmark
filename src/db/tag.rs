@@ -140,10 +140,9 @@ pub async fn update_tag(conn: &mut Connection, id: i32, modified: ModifyTag) -> 
 
 #[cfg(test)]
 pub mod tests {
-    use super::super::bookmark::{self, test::rand_bookmark};
-    use super::super::connection;
     use super::*;
-
+    use crate::db::bookmark::test::create_rand_bookmark;
+    use crate::db::connection;
     use crate::utils::rand::rand_str;
 
     use itertools::Itertools;
@@ -197,14 +196,14 @@ pub mod tests {
     async fn test_update_bookmark_tags() {
         let mut conn = connection::establish().await;
 
-        let new_bookmark = bookmark::create_bookmark(&mut conn, rand_bookmark()).await;
-        info!(?new_bookmark, "created bookmark");
+        let new = create_rand_bookmark(&mut conn).await;
+        info!(?new, "created bookmark");
 
-        let bookmarks_tags = get_tags_per_bookmark(&mut conn, vec![new_bookmark.clone()]).await;
+        let bookmarks_tags = get_tags_per_bookmark(&mut conn, vec![new.clone()]).await;
         assert_eq!(bookmarks_tags.len(), 1);
         let (bookmark, tags) = &bookmarks_tags[0];
         info!(?bookmark, ?tags, "bookmark has no tags");
-        assert_eq!(bookmark.id, new_bookmark.id);
+        assert_eq!(bookmark.id, new.id);
         assert!(tags.is_empty());
 
         let tag_names = vec![rand_str(4), rand_str(4)]
@@ -212,14 +211,14 @@ pub mod tests {
             .sorted()
             .map(|i| i.to_string())
             .collect_vec();
-        update_bookmark_tags(&mut conn, &new_bookmark, &tag_names).await;
+        update_bookmark_tags(&mut conn, &new, &tag_names).await;
         info!(?tag_names, "updated bookmark tags");
 
-        let bookmarks_tags = get_tags_per_bookmark(&mut conn, vec![new_bookmark.clone()]).await;
+        let bookmarks_tags = get_tags_per_bookmark(&mut conn, vec![new.clone()]).await;
         assert_eq!(bookmarks_tags.len(), 1);
         let (bookmark, tags) = &bookmarks_tags[0];
         info!(?bookmark, ?tags, "bookmark has tags");
-        assert_eq!(bookmark.id, new_bookmark.id);
+        assert_eq!(bookmark.id, new.id);
         assert_eq!(tags.len(), 2);
         assert_eq!(
             tags.into_iter()

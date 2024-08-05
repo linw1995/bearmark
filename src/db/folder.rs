@@ -129,15 +129,20 @@ pub async fn list_folders(conn: &mut Connection, cwd: &str) -> Vec<Folder> {
 }
 
 #[cfg(test)]
-pub mod tests {
-    use super::super::connection;
+pub(crate) mod tests {
     use super::*;
-    use crate::db::bookmark::test::rand_bookmark;
-    use crate::db::bookmark::{create_bookmark, Bookmark};
+    use crate::db::bookmark::test::create_rand_bookmark;
+    use crate::db::bookmark::Bookmark;
+    use crate::db::connection;
     use crate::utils::rand::rand_str;
 
     use futures::future::join_all;
     use tracing::info;
+
+    pub async fn create_rand_folder(conn: &mut Connection) -> Folder {
+        let path = format!("/{}", rand_str(10));
+        create_folder(conn, &path).await.unwrap()
+    }
 
     #[tokio::test]
     async fn create_new_folder() {
@@ -161,14 +166,12 @@ pub mod tests {
     async fn bookmarks_movements() {
         let mut conn = connection::establish().await;
 
-        let path = format!("/{}", rand_str(10));
-        let folder = create_folder(&mut conn, &path).await.unwrap();
+        let folder = create_rand_folder(&mut conn).await;
         info!(?folder, "folder created");
 
         let bookmark_ids = join_all((0..10).map(|_| async {
             let mut conn = connection::establish().await;
-            let bm = rand_bookmark();
-            let bm = create_bookmark(&mut conn, bm).await;
+            let bm = create_rand_bookmark(&mut conn).await;
             bm.id
         }))
         .await;

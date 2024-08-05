@@ -36,14 +36,14 @@ pub async fn create_bookmark(
     payload: Json<CreateBookmarkPayload>,
 ) -> Result<Json<Bookmark>, Error> {
     let payload = payload.into_inner();
-    let (new_bookmark, tags) = (
+    let (new, tags) = (
         bookmark::NewBookmark {
             title: payload.title,
             url: payload.url,
         },
         payload.tags,
     );
-    let m = bookmark::create_bookmark(&mut db, new_bookmark).await;
+    let m = bookmark::create_bookmark(&mut db, &new).await;
 
     tag::update_bookmark_tags(&mut db, &m, &tags).await;
 
