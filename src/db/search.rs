@@ -245,9 +245,16 @@ pub async fn get_bookmark_details(
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
+    use crate::db::bookmark::test::{create_rand_bookmark, rand_bookmark};
+    use crate::db::bookmark::NewBookmark;
+    use crate::db::bookmark::{create_bookmark, delete_bookmarks};
     use crate::db::connection;
+    use crate::db::folder::{create_folder, move_bookmarks};
+    use crate::db::schema::bookmarks;
+    use crate::db::tag::update_bookmark_tags;
     use crate::utils::rand::rand_str;
 
+    use futures::future::join_all;
     use itertools::Itertools;
     use tracing::info;
 
@@ -349,11 +356,6 @@ pub(crate) mod test {
     }
 
     pub async fn setup_searchable_bookmarks(conn: &mut Connection) {
-        use crate::db::bookmark::create_bookmark;
-        use crate::db::bookmark::NewBookmark;
-        use crate::db::schema::bookmarks;
-        use crate::db::tag::update_bookmark_tags;
-
         let values = vec![
             (
                 NewBookmark {
@@ -410,8 +412,8 @@ pub(crate) mod test {
             .await
             .expect("Error deleting bookmarks");
 
-        for (bookmark, tags) in values {
-            let bookmark = create_bookmark(conn, bookmark).await;
+        for (new, tags) in values {
+            let bookmark = create_bookmark(conn, &new).await;
             let tags = tags.iter().map(|t| t.to_string()).collect_vec();
             update_bookmark_tags(conn, &bookmark, &tags).await;
         }
@@ -454,13 +456,10 @@ pub(crate) mod test {
 
     #[tokio::test]
     async fn unsearchable_deleted_bookmark() {
-        use crate::db::bookmark::test::rand_bookmark;
-        use crate::db::bookmark::{create_bookmark, delete_bookmarks};
-
         let mut conn = connection::establish().await;
-        let new_bookmark = rand_bookmark();
-        let title = new_bookmark.title.clone();
-        let m = create_bookmark(&mut conn, new_bookmark).await;
+        let new = rand_bookmark();
+        let title = new.title.clone();
+        let m = create_bookmark(&mut conn, &new).await;
         info!(?m, "created");
         assert!(m.id > 0);
         assert!(m.deleted_at.is_none());
@@ -526,12 +525,6 @@ pub(crate) mod test {
 
     #[tokio::test]
     async fn search_bookmarks_in_folders() {
-        use futures::future::join_all;
-
-        use crate::db::bookmark::create_bookmark;
-        use crate::db::bookmark::test::rand_bookmark;
-        use crate::db::folder::{create_folder, move_bookmarks};
-
         let mut conn = connection::establish().await;
 
         let folder1_path = format!("/{}", rand_str(10));
@@ -543,8 +536,7 @@ pub(crate) mod test {
 
         let bookmark_ids = join_all((0..10).map(|_| async {
             let mut conn = connection::establish().await;
-            let bm = rand_bookmark();
-            let bm = create_bookmark(&mut conn, bm).await;
+            let bm = create_rand_bookmark(&mut conn).await;
             bm.id
         }))
         .await;
@@ -553,8 +545,7 @@ pub(crate) mod test {
             .await
             .unwrap();
 
-        let bm = rand_bookmark();
-        let bm = create_bookmark(&mut conn, bm).await;
+        let bm = create_rand_bookmark(&mut conn).await;
         let bookmark_ids = vec![bm.id];
 
         move_bookmarks(&mut conn, folder2.id, &bookmark_ids)
@@ -611,8 +602,7 @@ pub(crate) mod test {
         assert_eq!(rv.len(), 1);
 
         info!("search bookmarks in folder1 and its descendants, folder3");
-        let bm = rand_bookmark();
-        let bm = create_bookmark(&mut conn, bm).await;
+        let bm = create_rand_bookmark(&mut conn).await;
         let bookmark_ids = vec![bm.id];
         move_bookmarks(&mut conn, folder3.id, &bookmark_ids)
             .await
