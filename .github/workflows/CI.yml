@@ -70,18 +70,15 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        ./scripts/cli.sh coverage
+        ./scripts/cli.sh coverage-xml
       env:
         CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
         SCCACHE_GHA_ENABLED: "true"
         RUSTC_WRAPPER: "sccache"
 
-    # - name: Try to build release
-    #   continue-on-error: true
-    #   run: |
-    #     cargo build --bin serve --release --verbose
-    #     find . -name serve -type f
-    #   env:
-    #     CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
-    #     SCCACHE_GHA_ENABLED: "true"
-    #     RUSTC_WRAPPER: "sccache"
+    - name: Upload to codecov.io
+      uses: codecov/codecov-action@v2
+      with:
+        file: ./cobertura.xml
+        token: ${{secrets.CODECOV_TOKEN}} # not required for public repos
+        fail_ci_if_error: true

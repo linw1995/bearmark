@@ -20,3 +20,4 @@ Cargo.lock
 .vscode
 tarpaulin-report.html
 *.profraw
+cobertura.xml
