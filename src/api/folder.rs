@@ -93,17 +93,27 @@ pub fn routes() -> Vec<rocket::Route> {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
+    use crate::db::bookmark::test::create_rand_bookmark;
+    use crate::db::connection;
+    use crate::db::folder::test::create_rand_folder;
     use crate::utils::rand::rand_str;
 
     use rocket::http::Status;
-    use rocket::local::blocking::Client;
+    use rocket::local::asynchronous;
+    use rocket::local::blocking;
     use rocket_db_pools::Database;
     use tracing::info;
 
-    fn test_client() -> Client {
+    fn test_client() -> blocking::Client {
         let app = rocket::build().attach(Db::init()).mount("/", routes());
-        let client = Client::tracked(app).expect("valid rocket instance");
-        return client;
+        blocking::Client::tracked(app).expect("valid rocket instance")
+    }
+
+    async fn test_async_client() -> asynchronous::Client {
+        let app = rocket::build().attach(Db::init()).mount("/", routes());
+        asynchronous::Client::tracked(app)
+            .await
+            .expect("valid rocket instance")
     }
 
     #[test]
@@ -194,8 +204,40 @@ pub(crate) mod test {
         assert_eq!(folders[0].path, path);
     }
 
-    #[test]
-    fn bookmarks_movements() {
-        // TODO: test bookmarks movements
+    #[rocket::async_test]
+    async fn bookmarks_movements() {
+        let mut conn = connection::establish().await;
+        let bm = create_rand_bookmark(&mut conn).await;
+        let f01 = create_rand_folder(&mut conn).await;
+        let f02 = create_rand_folder(&mut conn).await;
+
+        let client = test_async_client().await;
+        let res = client
+            .put(format!("/move_in/{}/{}", bm.id, f01.id))
+            .dispatch()
+            .await;
+        assert_eq!(res.status(), Status::Ok);
+
+        // move in again
+        let res = client
+            .put(format!("/move_in/{}/{}", bm.id, f01.id))
+            .dispatch()
+            .await;
+        assert_eq!(res.status(), Status::BadRequest);
+
+        // move in to another folder
+        let res = client
+            .put(format!("/move_in/{}/{}", bm.id, f02.id))
+            .dispatch()
+            .await;
+        assert_eq!(res.status(), Status::Ok);
+
+        // move out
+        let res = client.put(format!("/move_out/{}", bm.id)).dispatch().await;
+        assert_eq!(res.status(), Status::Ok);
+
+        // move out again
+        let res = client.put(format!("/move_out/{}", bm.id)).dispatch().await;
+        assert_eq!(res.status(), Status::BadRequest);
     }
 }

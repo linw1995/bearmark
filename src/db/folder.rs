@@ -129,7 +129,7 @@ pub async fn list_folders(conn: &mut Connection, cwd: &str) -> Vec<Folder> {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+pub(crate) mod test {
     use super::*;
     use crate::db::bookmark::test::create_rand_bookmark;
     use crate::db::bookmark::Bookmark;
