@@ -3,15 +3,20 @@ name: Continuous Integration
 on:
   push:
     branches: ["main"]
+    paths:
+      - Cargo.toml
+      - src/**/*.rs
   pull_request:
     branches: ["main"]
+    paths:
+      - Cargo.toml
+      - src/**/*.rs
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   CI:
-
     runs-on: ubuntu-latest
 
     services:
@@ -30,55 +35,55 @@ jobs:
           - 5432:5432
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        sudo apt install -yq \
-          build-essential \
-          musl-dev \
-          musl-tools
-    - uses: actions-rust-lang/setup-rust-toolchain@v1
-      with:
-        target: x86_64-unknown-linux-musl
+      - name: Install dependencies
+        run: |
+          sudo apt install -yq \
+            build-essential \
+            musl-dev \
+            musl-tools
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: x86_64-unknown-linux-musl
 
-    - name: Run sccache-cache
-      uses: mozilla-actions/sccache-action@v0.0.5
-    - name: cargo-install cargo-tarpaulin
-      uses: baptiste0928/cargo-install@v3.1.0
-      with:
-        crate: cargo-tarpaulin
-    - name: cargo-install diesel_cli
-      uses: baptiste0928/cargo-install@v3.1.0
-      with:
-        crate: diesel_cli
-        features: postgres
-    - name: Setup
-      run: |
-        ./scripts/cli.sh setup
-      env:
-        POSTGRES_HOST: localhost
-        POSTGRES_PORT: 5432
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.5
+      - name: cargo-install cargo-tarpaulin
+        uses: baptiste0928/cargo-install@v3.1.0
+        with:
+          crate: cargo-tarpaulin
+      - name: cargo-install diesel_cli
+        uses: baptiste0928/cargo-install@v3.1.0
+        with:
+          crate: diesel_cli
+          features: postgres
+      - name: Setup
+        run: |
+          ./scripts/cli.sh setup
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
 
-    - name: Run lints
-      run: |
-        ./scripts/cli.sh lint
-      env:
-        CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
-        SCCACHE_GHA_ENABLED: "true"
-        RUSTC_WRAPPER: "sccache"
+      - name: Run lints
+        run: |
+          ./scripts/cli.sh lint
+        env:
+          CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
 
-    - name: Run tests with coverage
-      run: |
-        ./scripts/cli.sh coverage-xml
-      env:
-        CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
-        SCCACHE_GHA_ENABLED: "true"
-        RUSTC_WRAPPER: "sccache"
+      - name: Run tests with coverage
+        run: |
+          ./scripts/cli.sh coverage-xml
+        env:
+          CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
 
-    - name: Upload to codecov.io
-      uses: codecov/codecov-action@v2
-      with:
-        file: ./cobertura.xml
-        token: ${{secrets.CODECOV_TOKEN}} # not required for public repos
-        fail_ci_if_error: true
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./cobertura.xml
+          token: ${{secrets.CODECOV_TOKEN}} # not required for public repos
+          fail_ci_if_error: true
