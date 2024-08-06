@@ -6,6 +6,8 @@ pub enum Error {
     NotFound(String),
     #[response(status = 400)]
     BadRequest(String),
+    #[response(status = 500)]
+    InternalServer(String),
 }
 
 impl From<DatabaseError> for Error {
@@ -28,5 +30,11 @@ impl From<BearQLError> for Error {
             BearQLError::EmptyKeyword => Error::BadRequest("Empty keyword error".to_string()),
             BearQLError::EmptyTag => Error::BadRequest("Empty tag name error".to_string()),
         }
+    }
+}
+
+impl From<diesel::result::Error> for Error {
+    fn from(e: diesel::result::Error) -> Self {
+        Error::InternalServer(e.to_string())
     }
 }

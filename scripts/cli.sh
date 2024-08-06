@@ -16,6 +16,7 @@ help() {
 	echo ""
 	echo "  setup: Setup the project development environment"
 	echo "  teardown: Teardown the project development environment"
+	echo "  db-console: Open the database console"
 	echo "  serve: Run the api server"
 	echo "  test: Run tests"
 	echo "  coverage: Run tests with coverage"
@@ -70,6 +71,9 @@ main() {
 		echo ">>> Tearing down the project development environment"
 		docker compose down
 		echo ">>> Done"
+		;;
+	"db-console")
+		docker compose exec db psql -Upostgres
 		;;
 	"serve")
 		echo ">>> Running the api server"
