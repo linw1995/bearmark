@@ -53,7 +53,7 @@ pub async fn get_or_create_tags(conn: &mut Connection, tags: &[String]) -> Vec<T
 
     let tags = tags
         .iter()
-        .filter(|name| !exists_tags.iter().any(|tag| tag.name == **name))
+        .filter(|name| !exists_tags.iter().any(|tag| &&tag.name == name))
         .map(|name| NewTag {
             name: name.to_string(),
         })

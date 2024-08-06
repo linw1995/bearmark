@@ -194,7 +194,8 @@ pub fn routes() -> Vec<rocket::Route> {
 mod test {
     use super::*;
     use crate::db::bookmark::test::rand_bookmark;
-    use crate::utils;
+    use crate::utils::percent_encoding;
+    use crate::utils::rand::rand_str;
 
     use itertools::Itertools;
     use rocket::http::Status;
@@ -305,34 +306,34 @@ mod test {
         );
 
         assert_get_bookmarks!(
-            format!("/?q={}", utils::percent_encoding("#global weather")),
+            format!("/?q={}", percent_encoding("#global weather")),
             results.len() == 1,
             "Expected 1 bookmark, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            format!("/?q={}", utils::percent_encoding("#west weather")),
+            format!("/?q={}", percent_encoding("#west weather")),
             results.len() == 1,
             "Expected 1 bookmark, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            format!("/?q={}", utils::percent_encoding("#global #west weather")),
+            format!("/?q={}", percent_encoding("#global #west weather")),
             results.len() == 0,
             "Expected 0 bookmark, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            format!("/?q={}", utils::percent_encoding("#weather")),
+            format!("/?q={}", percent_encoding("#weather")),
             results.len() == 3,
             "Expected 3 bookmarks, got {}",
             results.len()
         );
         assert_get_bookmarks!(
-            format!("/?q={}&limit=1", utils::percent_encoding("#weather")),
+            format!("/?q={}&limit=1", percent_encoding("#weather")),
             results.len() == 1,
             "Expected 1 bookmark, got {}",
             results.len()
@@ -340,7 +341,7 @@ mod test {
         assert_get_bookmarks!(
             format!(
                 "/?q={}&limit=3&before={}",
-                utils::percent_encoding("#weather"),
+                percent_encoding("#weather"),
                 results[0].id
             ),
             results.len() == 2,
@@ -356,7 +357,7 @@ mod test {
             url: payload.url,
             title: payload.title,
             folder_id: None,
-            tags: vec!["rust".to_string(), "programming".to_string()],
+            tags: vec![rand_str(4), rand_str(4)],
         };
         info!(?payload, "creating");
         let title = payload.title.clone();
@@ -406,7 +407,7 @@ mod test {
             url: m.url,
             title: m.title,
             folder_id: None,
-            tags: vec!["rust".to_string(), "programming".to_string()],
+            tags: vec![rand_str(4), rand_str(4)],
         };
         let response = client
             .post(uri!(super::create_bookmark))
