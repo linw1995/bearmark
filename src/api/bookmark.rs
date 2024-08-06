@@ -216,7 +216,7 @@ mod test {
             url: "https://www.rust-lang.org".to_string(),
             title: "Rust".to_string(),
             folder_id: None,
-            tags: vec!["rust".to_string(), "programming".to_string()],
+            tags: vec![rand_str(4), rand_str(4)],
         };
         let response = client
             .post(uri!(super::create_bookmark))
@@ -237,7 +237,7 @@ mod test {
             url: "https://www.rust-lang.org".to_string(),
             title: "Rust".to_string(),
             folder_id: None,
-            tags: vec!["rust".to_string(), "programming".to_string()],
+            tags: vec![rand_str(4), rand_str(4)],
         };
         let response = client
             .post(uri!(super::create_bookmark))
