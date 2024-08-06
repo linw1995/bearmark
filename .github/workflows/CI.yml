@@ -4,11 +4,15 @@ on:
   push:
     branches: ["main"]
     paths:
+      - .github/workflows/CI.yml
+      - .cargo/config.toml
       - Cargo.toml
       - src/**/*.rs
   pull_request:
     branches: ["main"]
     paths:
+      - .github/workflows/CI.yml
+      - .cargo/config.toml
       - Cargo.toml
       - src/**/*.rs
 
@@ -80,6 +84,7 @@ jobs:
           CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
+          RUST_LOG: debug
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v4
