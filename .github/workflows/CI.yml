@@ -84,7 +84,7 @@ jobs:
           CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
-          RUST_LOG: debug
+          RUST_LOG: bearmark=debug,rocket=info
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v4

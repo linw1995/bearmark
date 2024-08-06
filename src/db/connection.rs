@@ -13,8 +13,16 @@ pub async fn establish() -> AsyncPgConnection {
 
     if cfg!(debug_assertions) {
         use diesel::connection::InstrumentationEvent;
-        use tracing::debug;
-        conn.set_instrumentation(|event: InstrumentationEvent<'_>| debug!(?event));
+        conn.set_instrumentation(|event: InstrumentationEvent<'_>| match event {
+            InstrumentationEvent::StartQuery { query, .. } => {
+                tracing::info!("Executing query: {}", query);
+            }
+            InstrumentationEvent::FinishQuery { query, error, .. } => match error {
+                Some(e) => tracing::error!("Query failed: {}\nError: {:?}", query, e),
+                None => tracing::debug!("Executing query succeeded: {}", query),
+            },
+            _ => {}
+        });
     }
 
     conn
