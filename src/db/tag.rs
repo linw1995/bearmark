@@ -40,7 +40,7 @@ pub struct ModifyTag {
     pub name: Option<String>,
 }
 
-pub async fn get_tags(conn: &mut Connection, tags: &Vec<String>) -> Vec<Tag> {
+pub async fn get_tags(conn: &mut Connection, tags: &[String]) -> Vec<Tag> {
     tags::table
         .filter(tags::name.eq_any(tags))
         .load(conn)
@@ -49,23 +49,24 @@ pub async fn get_tags(conn: &mut Connection, tags: &Vec<String>) -> Vec<Tag> {
 }
 
 pub async fn get_or_create_tags(conn: &mut Connection, tags: &[String]) -> Vec<Tag> {
-    use diesel::{dsl::now, ExpressionMethods};
+    let exists_tags = get_tags(conn, tags).await;
+
     let tags = tags
         .iter()
+        .filter(|name| !exists_tags.iter().any(|tag| tag.name == **name))
         .map(|name| NewTag {
             name: name.to_string(),
         })
         .collect::<Vec<_>>();
 
-    diesel::insert_into(tags::table)
+    let new_tags = diesel::insert_into(tags::table)
         .values(&tags)
-        .on_conflict(tags::name)
-        .do_update()
-        .set(tags::updated_at.eq(now))
         .returning(Tag::as_returning())
         .get_results(conn)
         .await
-        .expect("Error creating tags")
+        .expect("Error creating tags");
+
+    exists_tags.into_iter().chain(new_tags).collect()
 }
 
 pub async fn update_bookmark_tags(conn: &mut Connection, bookmark: &Bookmark, tags: &[String]) {

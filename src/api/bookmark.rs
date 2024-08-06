@@ -2,6 +2,8 @@ use super::errors::Error;
 use super::fairings::db::Db;
 use crate::db::{self, bookmark, folder, tag};
 
+use diesel_async::scoped_futures::ScopedFutureExt;
+use diesel_async::AsyncConnection;
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
 use rocket_db_pools::Connection;
@@ -43,16 +45,22 @@ pub async fn create_bookmark(
         },
         payload.tags,
     );
-    let m = bookmark::create_bookmark(&mut db, &new).await;
+    let (m, f, ts) = db
+        .transaction::<_, Error, _>(|db| {
+            async move {
+                let m = bookmark::create_bookmark(db, &new).await;
 
-    tag::update_bookmark_tags(&mut db, &m, &tags).await;
+                tag::update_bookmark_tags(db, &m, &tags).await;
 
-    if let Some(folder_id) = payload.folder_id {
-        // TODO: transaction required?
-        folder::move_bookmarks(&mut db, folder_id, &vec![m.id]).await?;
-    }
+                if let Some(folder_id) = payload.folder_id {
+                    folder::move_bookmarks(db, folder_id, &vec![m.id]).await?;
+                }
 
-    let (m, f, ts) = db::get_bookmark_details(&mut db, vec![m]).await.remove(0);
+                Ok(db::get_bookmark_details(db, vec![m]).await.remove(0))
+            }
+            .scope_boxed()
+        })
+        .await?;
 
     Ok(Json(Bookmark {
         id: m.id,
@@ -139,37 +147,34 @@ pub async fn update_bookmark(
         return Err(Error::BadRequest("No changes".to_string()));
     }
 
-    let m = if let Some(payload) = modify_bookmark {
-        bookmark::update_bookmark(&mut db, id, payload).await
-    } else {
-        bookmark::Bookmark::get(&mut db, id).await
-    }
-    .ok_or_else(|| Error::NotFound("Bookmark not found".to_string()))?;
+    let (m, folder, tags) = db
+        .transaction::<_, Error, _>(|db| {
+            async move {
+                let m = if let Some(payload) = modify_bookmark {
+                    bookmark::update_bookmark(db, id, payload).await
+                } else {
+                    bookmark::Bookmark::get(db, id).await
+                }
+                .ok_or_else(|| Error::NotFound("Bookmark not found".to_string()))?;
 
-    if let Some(payload) = modify_tags {
-        tag::update_bookmark_tags(&mut db, &m, &payload).await;
-    }
+                if let Some(payload) = modify_tags {
+                    tag::update_bookmark_tags(db, &m, &payload).await;
+                }
 
-    let rv = db::get_bookmark_details(&mut db, vec![m.clone()]).await;
-    if let Some((m, folder, tags)) = rv.first() {
-        return Ok(Json(Bookmark {
-            id: m.id,
-            title: m.title.clone(),
-            url: m.url.clone(),
-            folder: folder.clone().map(|f| f.path),
-            tags: tags.iter().map(|t| t.name.clone()).collect(),
-            created_at: m.created_at,
-            updated_at: m.updated_at,
-            deleted_at: m.deleted_at,
-        }));
-    }
+                Ok(db::get_bookmark_details(db, vec![m.clone()])
+                    .await
+                    .remove(0))
+            }
+            .scope_boxed()
+        })
+        .await?;
 
     Ok(Json(Bookmark {
         id: m.id,
-        title: m.title,
-        url: m.url,
-        folder: None,
-        tags: vec![],
+        title: m.title.clone(),
+        url: m.url.clone(),
+        folder: folder.clone().map(|f| f.path),
+        tags: tags.iter().map(|t| t.name.clone()).collect(),
         created_at: m.created_at,
         updated_at: m.updated_at,
         deleted_at: m.deleted_at,
