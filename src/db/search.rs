@@ -47,7 +47,7 @@ fn join_folder_path(cwd: &str, p: &str) -> String {
     } else {
         cwd.trim_end_matches(PATH_SEP)
             .split(PATH_SEP)
-            .chain(p.split(PATH_SEP))
+            .chain(p.trim_end_matches(PATH_SEP).split(PATH_SEP))
             .filter(|&x| x != ".")
             .collect::<Vec<_>>()
             .join(&PATH_SEP.to_string())
@@ -266,6 +266,8 @@ pub(crate) mod test {
             ("/", "/a/b", "/a/b"),
             ("/", "./a/b", "/a/b"),
             ("/a", "./b/c", "/a/b/c"),
+            ("/a", "./b/c/", "/a/b/c"),
+            ("/a/", "./b/c", "/a/b/c"),
         ] {
             let rv = join_folder_path(cwd, p);
             assert_eq!(rv, *expect);
