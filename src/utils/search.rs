@@ -40,6 +40,8 @@ pub enum Path<'a> {
 pub enum RelativePath<'a> {
     #[parse("{0}/{1}")]
     Join(Keyword<'a>, &'a Self),
+    #[parse("{0}/")]
+    NameEndSlash(Keyword<'a>),
     #[parse("{0}")]
     Name(Keyword<'a>),
     #[parse("/")] // for tailing "/", "//" ... syntax
@@ -145,6 +147,11 @@ fn _path_to_str_parts<'a>(p: Path<'a>, parts: &mut Vec<&'a str>) {
             parts.push(item.into());
             false
         }
+        RelativePath::NameEndSlash(item) => {
+            parts.push(item.into());
+            parts.push("");
+            false
+        }
         RelativePath::ExtraSlash() => {
             parts.push("");
             parts.push("");
@@ -187,6 +194,7 @@ mod test {
             r#"title | #rust #langs"#,
             r#"title ( #rust  #langs )"#,
             r#"title ( #rust | #langs )"#,
+            r#"/blog/"#,
         ] {
             let rv = parse_query(&src, &out_arena, &err_arena);
             info!(?rv, ?src, "parsed");

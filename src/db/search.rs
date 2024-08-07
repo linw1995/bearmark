@@ -319,6 +319,7 @@ pub(crate) mod test {
             ("./langs/rust//", Path("./langs/rust//".into())),
             ("//", Path("//".into())),
             (".//", Path(".//".into())),
+            ("/blog/", Path("/blog/".into())),
             (
                 "rust | langs go",
                 Or(
