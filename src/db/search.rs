@@ -43,22 +43,22 @@ type BookmarkFilter = Box<
 fn join_folder_path(cwd: &str, p: &str) -> String {
     const PATH_SEP: char = '/';
     if p.starts_with(PATH_SEP) {
-        p.trim_end_matches(PATH_SEP).to_string()
+        p.to_string()
     } else {
         cwd.trim_end_matches(PATH_SEP)
             .split(PATH_SEP)
-            .chain(p.trim_end_matches(PATH_SEP).split(PATH_SEP))
+            .chain(p.split(PATH_SEP))
             .filter(|&x| x != ".")
             .collect::<Vec<_>>()
             .join(&PATH_SEP.to_string())
     }
 }
 
-macro_rules! find_bookmarks_in_path {
+macro_rules! find_bookmarks_in_path_and_descendants {
     ($p: expr) => {
         {
             use super::schema::{bookmarks, folders};
-            let p = $p;
+            let p = $p.trim_end_matches('/').to_string(); // remove trailing slashes
             Box::new(
                 bookmarks::dsl::folder_id.eq_any(
                     folders::table
@@ -67,6 +67,21 @@ macro_rules! find_bookmarks_in_path {
                                 .like(format!("{}/%", p))
                                 .or(folders::dsl::path.eq(p)),
                         )
+                        .select(folders::id.nullable()), // .nullable() is a dirty patch to make check pass, no side effects
+                ),
+            )
+        }
+    };
+}
+macro_rules! find_bookmarks_in_path {
+    ($p: expr) => {
+        {
+            use super::schema::{bookmarks, folders};
+            let p = $p.trim_end_matches('/').to_string(); // remove trailing slashes
+            Box::new(
+                bookmarks::dsl::folder_id.eq_any(
+                    folders::table
+                        .filter(folders::dsl::path.eq(p))
                         .select(folders::id.nullable()), // .nullable() is a dirty patch to make check pass, no side effects
                 ),
             )
@@ -84,7 +99,20 @@ fn find_bookmarks(query: search::Query<'_>, cwd: &str) -> Result<BookmarkFilter,
         And(a, b) => Box::new(find_bookmarks(*a, cwd)?.and(find_bookmarks(*b, cwd)?)),
         Parenthesized(a) => find_bookmarks(*a, cwd)?,
         Primitive(p) => match p {
-            Path(p) => find_bookmarks_in_path!(join_folder_path(cwd, &p.to_string())),
+            Path(p) => {
+                let target = p.to_string();
+                let path = join_folder_path(cwd, &target);
+                debug!(?path, ?cwd, ?target, "searching in path");
+                if path == "/" {
+                    Box::new(bookmarks::dsl::id.eq(bookmarks::dsl::id)) // always true, no side effects
+                } else if path == "//" {
+                    Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
+                } else if path.ends_with("//") {
+                    find_bookmarks_in_path!(path) // special syntax. search bookmarks in the folder only
+                } else {
+                    find_bookmarks_in_path_and_descendants!(path) // search bookmarks in the folder and its descendants
+                }
+            }
             Tag(t) => {
                 let t = t.to_string();
                 let t = t.trim_start_matches('#').trim().to_string();
@@ -170,7 +198,18 @@ async fn search_bookmarks_with_query(
             .filter(bookmarks::dsl::deleted_at.is_null())
             .into_boxed();
         if let Some(cwd) = cwd {
-            query = query.filter(find_bookmarks_in_path!(cwd));
+            if cwd != "/" {
+                let expression: Box<
+                    dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>,
+                > = if cwd == "//" {
+                    Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
+                } else if cwd.ends_with("//") {
+                    find_bookmarks_in_path!(cwd) // special syntax. search bookmarks in the folder only
+                } else {
+                    find_bookmarks_in_path_and_descendants!(cwd) // search bookmarks in the folder and its descendants
+                };
+                query = query.filter(expression);
+            }
         }
         if before > 0 {
             query = query.filter(bookmarks::dsl::id.lt(before));
@@ -256,19 +295,23 @@ pub(crate) mod test {
 
     use futures::future::join_all;
     use itertools::Itertools;
-    use tracing::info;
+    use tracing::{debug, info};
 
     #[test]
     fn test_join_path() {
         for (cwd, p, expect) in &[
             ("/", "./a", "/a"),
-            ("/", "/a", "/a"),
+            ("/b", "/a", "/a"),
+            ("/", "./a/", "/a/"),
+            ("/b", "/a/", "/a/"),
+            ("/", "./a//", "/a//"),
+            ("/b", "/a//", "/a//"),
             ("/", "/a/b", "/a/b"),
             ("/", "./a/b", "/a/b"),
             ("/a", "./b/c", "/a/b/c"),
-            ("/a", "./b/c/", "/a/b/c"),
-            ("/a/", "./b/c", "/a/b/c"),
+            ("/a", "./b/c/", "/a/b/c/"),
         ] {
+            debug!(?cwd, ?p, ?expect, "testing join path");
             let rv = join_folder_path(cwd, p);
             assert_eq!(rv, *expect);
         }
@@ -532,7 +575,8 @@ pub(crate) mod test {
 
         let folder1_path = format!("/{}", rand_str(10));
         let folder2_path = format!("/{}", rand_str(10));
-        let folder3_path = format!("{}/{}", folder1_path, rand_str(10));
+        let folder3_name = rand_str(10);
+        let folder3_path = format!("{}/{}", folder1_path, folder3_name);
         let folder1 = create_folder(&mut conn, &folder1_path).await.unwrap();
         let folder2 = create_folder(&mut conn, &folder2_path).await.unwrap();
         let folder3 = create_folder(&mut conn, &folder3_path).await.unwrap();
@@ -614,5 +658,63 @@ pub(crate) mod test {
         info!(?rv, "searched bookmarks");
         let rv = rv.unwrap();
         assert_eq!(rv.len(), 11);
+
+        info!("search bookmarks in folder1 and its descendants, folder3 with single tailing slash");
+        let rv =
+            search_bookmarks(&mut conn, Some(&format!("{}/", folder1_path)), None, 0, 100).await;
+        info!(?rv, "searched bookmarks");
+        let rv = rv.unwrap();
+        assert_eq!(rv.len(), 11);
+
+        info!("search bookmarks in folder1 only");
+        let rv = search_bookmarks(
+            &mut conn,
+            Some(&format!("{}//", &folder1_path)),
+            None,
+            0,
+            100,
+        )
+        .await;
+        info!(?rv, "searched bookmarks");
+        let rv = rv.unwrap();
+        assert_eq!(rv.len(), 10);
+
+        info!("search bookmarks in root");
+        let rv = search_bookmarks(&mut conn, None, None, 0, 100).await;
+        info!(?rv, "searched bookmarks");
+        let rv = rv.unwrap();
+        assert!(rv.len() > 11);
+
+        info!("search bookmarks in root only");
+        let rv = search_bookmarks(&mut conn, Some("//"), None, 0, 100).await;
+        info!(?rv, "searched bookmarks");
+        let rv = rv.unwrap();
+        assert!(rv.len() > 11);
+
+        info!("search bookmarks with cwd");
+        let rv = search_bookmarks(&mut conn, None, Some(&folder1_path), 0, 100).await;
+        info!(?rv, "searched bookmarks");
+        let rv = rv.unwrap();
+        assert_eq!(rv.len(), 11);
+
+        info!("search bookmarks with cwd and relative path");
+        let rv = search_bookmarks(
+            &mut conn,
+            Some(&format!("./{}", folder3_name)),
+            Some(&folder1_path),
+            0,
+            100,
+        )
+        .await;
+        info!(?rv, "searched bookmarks");
+        let rv = rv.unwrap();
+        assert_eq!(rv.len(), 1);
+
+        info!("search bookmarks with cwd but overwrite by absolute path");
+        let rv =
+            search_bookmarks(&mut conn, Some(&folder2_path), Some(&folder1_path), 0, 100).await;
+        info!(?rv, "searched bookmarks");
+        let rv = rv.unwrap();
+        assert_eq!(rv.len(), 1);
     }
 }
