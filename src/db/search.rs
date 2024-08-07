@@ -43,7 +43,7 @@ type BookmarkFilter = Box<
 fn join_folder_path(cwd: &str, p: &str) -> String {
     const PATH_SEP: char = '/';
     if p.starts_with(PATH_SEP) {
-        p.to_string()
+        p.trim_end_matches(PATH_SEP).to_string()
     } else {
         cwd.trim_end_matches(PATH_SEP)
             .split(PATH_SEP)
