@@ -292,6 +292,8 @@ pub(crate) mod test {
     #[test]
     fn test_join_path() {
         for (cwd, p, expect) in &[
+            ("/", "./", "/"),
+            ("/", "/", "/"),
             ("/", "./a", "/a"),
             ("/b", "/a", "/a"),
             ("/", "./a/", "/a/"),
