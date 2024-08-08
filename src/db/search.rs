@@ -1,4 +1,5 @@
 use diesel::dsl::LeftJoinQuerySource;
+use diesel::expression::BoxableExpression;
 use diesel::pg::Pg;
 use diesel::prelude::*;
 use diesel::sql_types::Bool;
@@ -43,11 +44,11 @@ type BookmarkFilter = Box<
 fn join_folder_path(cwd: &str, p: &str) -> String {
     const PATH_SEP: char = '/';
     if p.starts_with(PATH_SEP) {
-        p.trim_end_matches(PATH_SEP).to_string()
+        p.to_string()
     } else {
         cwd.trim_end_matches(PATH_SEP)
             .split(PATH_SEP)
-            .chain(p.trim_end_matches(PATH_SEP).split(PATH_SEP))
+            .chain(p.split(PATH_SEP))
             .filter(|&x| x != ".")
             .collect::<Vec<_>>()
             .join(&PATH_SEP.to_string())
@@ -55,23 +56,33 @@ fn join_folder_path(cwd: &str, p: &str) -> String {
 }
 
 macro_rules! find_bookmarks_in_path {
-    ($p: expr) => {
-        {
-            use super::schema::{bookmarks, folders};
-            let p = $p;
+    ($p: expr) => {{
+        use super::schema::{bookmarks, folders};
+
+        let p = $p;
+        let without_descendants = p.ends_with("//");
+        let p = p.trim_end_matches('/').to_string(); // remove trailing slashes
+
+        let expression: Box<dyn BoxableExpression<_, _, SqlType = Bool>> = if without_descendants {
+            // special syntax. search bookmarks in the folder only
+            Box::new(folders::dsl::path.eq(p))
+        } else {
+            // search bookmarks in the folder and its descendants
             Box::new(
-                bookmarks::dsl::folder_id.eq_any(
-                    folders::table
-                        .filter(
-                            folders::dsl::path
-                                .like(format!("{}/%", p))
-                                .or(folders::dsl::path.eq(p)),
-                        )
-                        .select(folders::id.nullable()), // .nullable() is a dirty patch to make check pass, no side effects
-                ),
+                folders::dsl::path
+                    .like(format!("{}/%", p))
+                    .or(folders::dsl::path.eq(p)),
             )
-        }
-    };
+        };
+        Box::new(
+            bookmarks::dsl::folder_id.eq_any(
+                folders::table
+                    .filter(expression)
+                    .select(folders::id.nullable(), // .nullable() is a dirty patch to make check pass, no side effects
+                ),
+            ),
+        )
+    }};
 }
 
 fn find_bookmarks(query: search::Query<'_>, cwd: &str) -> Result<BookmarkFilter, BearQLError> {
@@ -84,7 +95,18 @@ fn find_bookmarks(query: search::Query<'_>, cwd: &str) -> Result<BookmarkFilter,
         And(a, b) => Box::new(find_bookmarks(*a, cwd)?.and(find_bookmarks(*b, cwd)?)),
         Parenthesized(a) => find_bookmarks(*a, cwd)?,
         Primitive(p) => match p {
-            Path(p) => find_bookmarks_in_path!(join_folder_path(cwd, &p.to_string())),
+            Path(p) => {
+                let target = p.to_string();
+                let path = join_folder_path(cwd, &target);
+                debug!(?path, ?cwd, ?target, "searching in path");
+                if path == "/" {
+                    Box::new(bookmarks::dsl::id.eq(bookmarks::dsl::id)) // always true, no side effects
+                } else if path == "//" {
+                    Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
+                } else {
+                    find_bookmarks_in_path!(path)
+                }
+            }
             Tag(t) => {
                 let t = t.to_string();
                 let t = t.trim_start_matches('#').trim().to_string();
@@ -170,7 +192,16 @@ async fn search_bookmarks_with_query(
             .filter(bookmarks::dsl::deleted_at.is_null())
             .into_boxed();
         if let Some(cwd) = cwd {
-            query = query.filter(find_bookmarks_in_path!(cwd));
+            if cwd != "/" {
+                let expression: Box<
+                    dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>,
+                > = if cwd == "//" {
+                    Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
+                } else {
+                    find_bookmarks_in_path!(cwd)
+                };
+                query = query.filter(expression);
+            }
         }
         if before > 0 {
             query = query.filter(bookmarks::dsl::id.lt(before));
@@ -253,22 +284,28 @@ pub(crate) mod test {
     use crate::db::schema::bookmarks;
     use crate::db::tag::update_bookmark_tags;
     use crate::utils::rand::rand_str;
+    use crate::utils::DatabaseError;
 
-    use futures::future::join_all;
     use itertools::Itertools;
-    use tracing::info;
+    use tracing::{debug, info};
 
     #[test]
     fn test_join_path() {
         for (cwd, p, expect) in &[
+            ("/", "./", "/"),
+            ("/", "/", "/"),
             ("/", "./a", "/a"),
-            ("/", "/a", "/a"),
+            ("/b", "/a", "/a"),
+            ("/", "./a/", "/a/"),
+            ("/b", "/a/", "/a/"),
+            ("/", "./a//", "/a//"),
+            ("/b", "/a//", "/a//"),
             ("/", "/a/b", "/a/b"),
             ("/", "./a/b", "/a/b"),
             ("/a", "./b/c", "/a/b/c"),
-            ("/a", "./b/c/", "/a/b/c"),
-            ("/a/", "./b/c", "/a/b/c"),
+            ("/a", "./b/c/", "/a/b/c/"),
         ] {
+            debug!(?cwd, ?p, ?expect, "testing join path");
             let rv = join_folder_path(cwd, p);
             assert_eq!(rv, *expect);
         }
@@ -423,7 +460,6 @@ pub(crate) mod test {
     }
 
     #[tokio::test]
-    #[file_serial] // For allowing remove data of table in test
     pub async fn search_bookmarks_with_pagination() {
         let mut conn = connection::establish().await;
         setup_searchable_bookmarks(&mut conn).await;
@@ -482,7 +518,6 @@ pub(crate) mod test {
     }
 
     #[tokio::test]
-    #[file_serial] // For allowing remove data of table in test
     async fn test_search_bookmarks_with_tags() {
         let mut conn = connection::establish().await;
         setup_searchable_bookmarks(&mut conn).await;
@@ -526,93 +561,191 @@ pub(crate) mod test {
         assert_eq!(rv.len(), 2);
     }
 
+    async fn setup_folders_and_bookmarks(
+        conn: &mut Connection,
+        folder_bookmarks_counter: Vec<(String, usize)>,
+    ) -> Result<(), DatabaseError> {
+        for (folder_name, bookmarks_count) in folder_bookmarks_counter {
+            let folder = create_folder(conn, &folder_name).await?;
+            let mut bookmark_ids = vec![];
+            for _ in 0..bookmarks_count {
+                let bookmark = create_rand_bookmark(conn).await;
+                bookmark_ids.push(bookmark.id);
+            }
+            move_bookmarks(conn, folder.id, &bookmark_ids).await?;
+        }
+        Ok(())
+    }
+
+    macro_rules! assert_searched_bookmarks {
+        ($query:expr, $cwd:expr, $expected_size:literal) => {
+            let mut conn = connection::establish().await;
+            let query: Option<&str> = $query;
+            let cwd: Option<&str> = $cwd;
+            let rv = search_bookmarks(&mut conn, query, cwd, 0, 100).await;
+            info!(?query, ?cwd, ?rv, "searched bookmarks");
+            let rv = rv.unwrap();
+            assert_eq!(rv.len(), $expected_size);
+        };
+    }
+
+    struct SetupFoldersAndBookmarksDefaultReturn {
+        folder1_path: String,
+        folder2_path: String,
+        folder3_name: String,
+    }
+
+    async fn setup_folders_and_bookmarks_default(
+        conn: &mut Connection,
+    ) -> SetupFoldersAndBookmarksDefaultReturn {
+        let folder1_path = format!("/{}", rand_str(10));
+        let folder2_path = format!("/{}", rand_str(10));
+        let folder3_name = rand_str(10);
+        let folder3_path = format!("{}/{}", folder1_path, folder3_name);
+
+        setup_folders_and_bookmarks(
+            conn,
+            vec![
+                (folder1_path.clone(), 10),
+                (folder2_path.clone(), 1),
+                (folder3_path.clone(), 1), // descendant of folder1
+            ],
+        )
+        .await
+        .unwrap();
+
+        SetupFoldersAndBookmarksDefaultReturn {
+            folder1_path,
+            folder2_path,
+            folder3_name,
+        }
+    }
+
     #[tokio::test]
     async fn search_bookmarks_in_folders() {
         let mut conn = connection::establish().await;
 
-        let folder1_path = format!("/{}", rand_str(10));
-        let folder2_path = format!("/{}", rand_str(10));
-        let folder3_path = format!("{}/{}", folder1_path, rand_str(10));
-        let folder1 = create_folder(&mut conn, &folder1_path).await.unwrap();
-        let folder2 = create_folder(&mut conn, &folder2_path).await.unwrap();
-        let folder3 = create_folder(&mut conn, &folder3_path).await.unwrap();
+        let SetupFoldersAndBookmarksDefaultReturn {
+            folder1_path,
+            folder2_path,
+            ..
+        } = setup_folders_and_bookmarks_default(&mut conn).await;
 
-        let bookmark_ids = join_all((0..10).map(|_| async {
-            let mut conn = connection::establish().await;
-            let bm = create_rand_bookmark(&mut conn).await;
-            bm.id
-        }))
-        .await;
-
-        move_bookmarks(&mut conn, folder1.id, &bookmark_ids)
-            .await
-            .unwrap();
-
-        let bm = create_rand_bookmark(&mut conn).await;
-        let bookmark_ids = vec![bm.id];
-
-        move_bookmarks(&mut conn, folder2.id, &bookmark_ids)
-            .await
-            .unwrap();
-
-        info!("search bookmarks in folder1");
-        let rv = search_bookmarks(&mut conn, Some(&folder1_path), None, 0, 10).await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 10);
+        info!("search bookmarks in folder1 and its descendants");
+        assert_searched_bookmarks!(Some(&folder1_path), None, 11);
 
         info!("search bookmarks in folder2");
-        let rv = search_bookmarks(&mut conn, Some(&folder2_path), None, 0, 10).await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 1);
+        assert_searched_bookmarks!(Some(&folder2_path), None, 1);
 
-        info!("search bookmarks in folder1 and folder2");
-        let rv = search_bookmarks(
-            &mut conn,
-            Some(&format!("{} | {}", folder1_path, folder2_path)),
-            None,
-            0,
-            100,
-        )
-        .await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 11);
+        let query = format!("{} | {}", folder1_path, folder2_path);
+        info!(?query, "search bookmarks in folder1 and folder2");
+        assert_searched_bookmarks!(Some(&query), None, 12);
 
-        let rv = search_bookmarks(
-            &mut conn,
-            Some(&format!("{} | {}", folder1_path, folder2_path)),
-            None,
-            0,
-            5,
-        )
-        .await;
-        info!(?rv, "searched bookmarks");
+        let query = format!("{}//", folder1_path);
+        info!(?query, "search bookmarks in folder1 only");
+        assert_searched_bookmarks!(Some(&query), None, 10);
+
+        let query = format!("{}// | {}", folder1_path, folder2_path);
+        info!(?query, "search bookmarks in folder1 only and folder2");
+        assert_searched_bookmarks!(Some(&query), None, 11);
+    }
+
+    #[tokio::test]
+    async fn search_bookmarks_in_folders_pagination() {
+        let mut conn = connection::establish().await;
+
+        let SetupFoldersAndBookmarksDefaultReturn {
+            folder1_path,
+            folder2_path,
+            ..
+        } = setup_folders_and_bookmarks_default(&mut conn).await;
+
+        let query = format!("{} | {}", folder1_path, folder2_path);
+        let rv = search_bookmarks(&mut conn, Some(&query), None, 0, 5).await;
+        info!(?query, ?rv, "searched bookmarks");
         let rv = rv.unwrap();
         assert_eq!(rv.len(), 5);
 
-        let rv = search_bookmarks(
-            &mut conn,
-            Some(&format!("{} | {}", folder1_path, folder2_path)),
-            None,
-            0,
-            1,
-        )
-        .await;
-        info!(?rv, "searched bookmarks");
+        let rv = search_bookmarks(&mut conn, Some(&query), None, rv[4].0.id, 100).await;
+        info!(?query, ?rv, "searched bookmarks");
         let rv = rv.unwrap();
-        assert_eq!(rv.len(), 1);
+        assert_eq!(rv.len(), 7);
+    }
 
-        info!("search bookmarks in folder1 and its descendants, folder3");
-        let bm = create_rand_bookmark(&mut conn).await;
-        let bookmark_ids = vec![bm.id];
-        move_bookmarks(&mut conn, folder3.id, &bookmark_ids)
+    #[tokio::test]
+    async fn search_bookmarks_in_folders_after_normalizing() {
+        let mut conn = connection::establish().await;
+
+        let SetupFoldersAndBookmarksDefaultReturn { folder1_path, .. } =
+            setup_folders_and_bookmarks_default(&mut conn).await;
+
+        let query = format!("{}/", folder1_path);
+        info!(
+            ?query,
+            "search bookmarks in folder1 and its descendants with single tailing slash"
+        );
+        assert_searched_bookmarks!(Some(&query), None, 11);
+    }
+
+    // #[ignore = "need to access DB exclusively"]
+    #[tokio::test]
+    async fn search_bookmarks_in_root() {
+        let mut conn = connection::establish().await;
+
+        // delete all bookmarks
+        diesel::delete(bookmarks::table)
+            .execute(&mut conn)
             .await
-            .unwrap();
-        let rv = search_bookmarks(&mut conn, Some(&folder1_path), None, 0, 100).await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 11);
+            .expect("Error deleting bookmarks");
+
+        let _ = create_rand_bookmark(&mut conn).await;
+
+        let _ = setup_folders_and_bookmarks_default(&mut conn).await;
+
+        info!("search bookmarks in root");
+        assert_searched_bookmarks!(None, None, 13); // 11 + 1 + 1
+
+        info!("search bookmarks in root explicitly");
+        assert_searched_bookmarks!(Some("/"), None, 13); // 11 + 1 + 1
+
+        info!("search bookmarks in root only");
+        assert_searched_bookmarks!(Some("//"), None, 1);
+
+        info!("search bookmarks in root only via cwd");
+        assert_searched_bookmarks!(None, Some("//"), 1);
+    }
+
+    #[tokio::test]
+    async fn search_bookmarks_in_folders_from_cwd() {
+        let mut conn = connection::establish().await;
+
+        let SetupFoldersAndBookmarksDefaultReturn {
+            folder1_path,
+            folder2_path,
+            folder3_name,
+            ..
+        } = setup_folders_and_bookmarks_default(&mut conn).await;
+
+        info!("search bookmarks with cwd");
+        assert_searched_bookmarks!(None, Some(&folder1_path), 11); // 10 + 1
+
+        let query = format!("./{}", folder3_name);
+        info!(?query, "search bookmarks with cwd and relative path");
+        assert_searched_bookmarks!(Some(&query), Some(&folder1_path), 1);
+
+        let query = format!("./{} | ./", folder3_name);
+        info!(?query, "search bookmarks with cwd and relative path");
+        assert_searched_bookmarks!(Some(&query), Some(&folder1_path), 11); // 1 + 10
+
+        let query = format!("./{} | .//", folder3_name);
+        info!(?query, "search bookmarks with cwd and relative path");
+        assert_searched_bookmarks!(Some(&query), Some(&folder1_path), 11); // 1 + 10
+
+        let query = ".//";
+        info!(?query, "search bookmarks with cwd and relative path");
+        assert_searched_bookmarks!(Some(&query), Some(&folder1_path), 10); // 10
+
+        info!("search bookmarks with cwd but overwrite by absolute path");
+        assert_searched_bookmarks!(Some(&folder2_path), Some(&folder1_path), 1);
     }
 }
