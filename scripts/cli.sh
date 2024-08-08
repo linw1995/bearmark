@@ -81,18 +81,18 @@ main() {
 		;;
 	"test")
 		echo ">>> Running tests"
-		cargo test -- --show-output "$@"
+		cargo test -- --show-output --test-threads 1 "$@"
 		cleanup_profraw_files
 		;;
 	"coverage")
 		echo ">>> Running tests with coverage"
-		cargo tarpaulin --out html --skip-clean -- --show-output "$@"
+		cargo tarpaulin --out html --skip-clean -- --show-output --test-threads 1 "$@"
 		echo "open file ./tarpaulin-report.html to see coverage report"
 		cleanup_profraw_files
 		;;
 	"coverage-xml")
 		echo ">>> Running tests with coverage"
-		cargo tarpaulin --out xml --skip-clean -- --show-output "$@"
+		cargo tarpaulin --out xml --skip-clean -- --show-output --test-threads 1 "$@"
 		cleanup_profraw_files
 		;;
 	"install-deps")

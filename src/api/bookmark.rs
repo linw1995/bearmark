@@ -254,7 +254,6 @@ mod test {
     }
 
     #[rocket::async_test]
-    #[file_serial] // For reusing another test setup.
     async fn search_bookmarks() {
         use rocket::local::asynchronous::Client;
 

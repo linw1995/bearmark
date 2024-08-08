@@ -292,8 +292,8 @@ pub(crate) mod test {
     use crate::db::schema::bookmarks;
     use crate::db::tag::update_bookmark_tags;
     use crate::utils::rand::rand_str;
+    use crate::utils::DatabaseError;
 
-    use futures::future::join_all;
     use itertools::Itertools;
     use tracing::{debug, info};
 
@@ -466,7 +466,6 @@ pub(crate) mod test {
     }
 
     #[tokio::test]
-    #[file_serial] // For allowing remove data of table in test
     pub async fn search_bookmarks_with_pagination() {
         let mut conn = connection::establish().await;
         setup_searchable_bookmarks(&mut conn).await;
@@ -525,7 +524,6 @@ pub(crate) mod test {
     }
 
     #[tokio::test]
-    #[file_serial] // For allowing remove data of table in test
     async fn test_search_bookmarks_with_tags() {
         let mut conn = connection::establish().await;
         setup_searchable_bookmarks(&mut conn).await;
@@ -569,60 +567,104 @@ pub(crate) mod test {
         assert_eq!(rv.len(), 2);
     }
 
-    #[tokio::test]
-    async fn search_bookmarks_in_folders() {
-        let mut conn = connection::establish().await;
+    async fn setup_folders_and_bookmarks(
+        conn: &mut Connection,
+        folder_bookmarks_counter: Vec<(String, usize)>,
+    ) -> Result<(), DatabaseError> {
+        for (folder_name, bookmarks_count) in folder_bookmarks_counter {
+            let folder = create_folder(conn, &folder_name).await?;
+            let mut bookmark_ids = vec![];
+            for _ in 0..bookmarks_count {
+                let bookmark = create_rand_bookmark(conn).await;
+                bookmark_ids.push(bookmark.id);
+            }
+            move_bookmarks(conn, folder.id, &bookmark_ids).await?;
+        }
+        Ok(())
+    }
 
+    macro_rules! assert_searched_bookmarks {
+        ($query:expr, $cwd:expr, $expected_size:literal) => {
+            let mut conn = connection::establish().await;
+            let query: Option<&str> = $query;
+            let cwd: Option<&str> = $cwd;
+            let rv = search_bookmarks(&mut conn, query, cwd, 0, 100).await;
+            info!(?query, ?cwd, ?rv, "searched bookmarks");
+            let rv = rv.unwrap();
+            assert_eq!(rv.len(), $expected_size);
+        };
+    }
+
+    struct SetupFoldersAndBookmarksDefaultReturn {
+        folder1_path: String,
+        folder2_path: String,
+        folder3_name: String,
+    }
+
+    async fn setup_folders_and_bookmarks_default(
+        conn: &mut Connection,
+    ) -> SetupFoldersAndBookmarksDefaultReturn {
         let folder1_path = format!("/{}", rand_str(10));
         let folder2_path = format!("/{}", rand_str(10));
         let folder3_name = rand_str(10);
         let folder3_path = format!("{}/{}", folder1_path, folder3_name);
-        let folder1 = create_folder(&mut conn, &folder1_path).await.unwrap();
-        let folder2 = create_folder(&mut conn, &folder2_path).await.unwrap();
-        let folder3 = create_folder(&mut conn, &folder3_path).await.unwrap();
 
-        let bookmark_ids = join_all((0..10).map(|_| async {
-            let mut conn = connection::establish().await;
-            let bm = create_rand_bookmark(&mut conn).await;
-            bm.id
-        }))
-        .await;
+        setup_folders_and_bookmarks(
+            conn,
+            vec![
+                (folder1_path.clone(), 10),
+                (folder2_path.clone(), 1),
+                (folder3_path.clone(), 1), // descendant of folder1
+            ],
+        )
+        .await
+        .unwrap();
 
-        move_bookmarks(&mut conn, folder1.id, &bookmark_ids)
-            .await
-            .unwrap();
+        SetupFoldersAndBookmarksDefaultReturn {
+            folder1_path,
+            folder2_path,
+            folder3_name,
+        }
+    }
 
-        let bm = create_rand_bookmark(&mut conn).await;
-        let bookmark_ids = vec![bm.id];
+    #[tokio::test]
+    async fn search_bookmarks_in_folders() {
+        let mut conn = connection::establish().await;
 
-        move_bookmarks(&mut conn, folder2.id, &bookmark_ids)
-            .await
-            .unwrap();
+        let SetupFoldersAndBookmarksDefaultReturn {
+            folder1_path,
+            folder2_path,
+            ..
+        } = setup_folders_and_bookmarks_default(&mut conn).await;
 
-        info!("search bookmarks in folder1");
-        let rv = search_bookmarks(&mut conn, Some(&folder1_path), None, 0, 10).await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 10);
+        info!("search bookmarks in folder1 and its descendants");
+        assert_searched_bookmarks!(Some(&folder1_path), None, 11);
 
         info!("search bookmarks in folder2");
-        let rv = search_bookmarks(&mut conn, Some(&folder2_path), None, 0, 10).await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 1);
+        assert_searched_bookmarks!(Some(&folder2_path), None, 1);
 
-        info!("search bookmarks in folder1 and folder2");
-        let rv = search_bookmarks(
-            &mut conn,
-            Some(&format!("{} | {}", folder1_path, folder2_path)),
-            None,
-            0,
-            100,
-        )
-        .await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 11);
+        let query = format!("{} | {}", folder1_path, folder2_path);
+        info!(?query, "search bookmarks in folder1 and folder2");
+        assert_searched_bookmarks!(Some(&query), None, 12);
+
+        let query = format!("{}//", folder1_path);
+        info!(?query, "search bookmarks in folder1 only");
+        assert_searched_bookmarks!(Some(&query), None, 10);
+
+        let query = format!("{}// | {}", folder1_path, folder2_path);
+        info!(?query, "search bookmarks in folder1 only and folder2");
+        assert_searched_bookmarks!(Some(&query), None, 11);
+    }
+
+    #[tokio::test]
+    async fn search_bookmarks_in_folders_pagination() {
+        let mut conn = connection::establish().await;
+
+        let SetupFoldersAndBookmarksDefaultReturn {
+            folder1_path,
+            folder2_path,
+            ..
+        } = setup_folders_and_bookmarks_default(&mut conn).await;
 
         let rv = search_bookmarks(
             &mut conn,
@@ -647,74 +689,76 @@ pub(crate) mod test {
         info!(?rv, "searched bookmarks");
         let rv = rv.unwrap();
         assert_eq!(rv.len(), 1);
+    }
 
-        info!("search bookmarks in folder1 and its descendants, folder3");
-        let bm = create_rand_bookmark(&mut conn).await;
-        let bookmark_ids = vec![bm.id];
-        move_bookmarks(&mut conn, folder3.id, &bookmark_ids)
+    #[tokio::test]
+    async fn search_bookmarks_in_folders_after_normalizing() {
+        let mut conn = connection::establish().await;
+
+        let SetupFoldersAndBookmarksDefaultReturn { folder1_path, .. } =
+            setup_folders_and_bookmarks_default(&mut conn).await;
+
+        let query = format!("{}/", folder1_path);
+        info!(
+            ?query,
+            "search bookmarks in folder1 and its descendants with single tailing slash"
+        );
+        assert_searched_bookmarks!(Some(&query), None, 11);
+    }
+
+    // #[ignore = "need to access DB exclusively"]
+    #[tokio::test]
+    async fn search_bookmarks_in_root() {
+        let mut conn = connection::establish().await;
+
+        // delete all bookmarks
+        diesel::delete(bookmarks::table)
+            .execute(&mut conn)
             .await
-            .unwrap();
-        let rv = search_bookmarks(&mut conn, Some(&folder1_path), None, 0, 100).await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 11);
+            .expect("Error deleting bookmarks");
 
-        info!("search bookmarks in folder1 and its descendants, folder3 with single tailing slash");
-        let rv =
-            search_bookmarks(&mut conn, Some(&format!("{}/", folder1_path)), None, 0, 100).await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 11);
+        let _ = create_rand_bookmark(&mut conn).await;
 
-        info!("search bookmarks in folder1 only");
-        let rv = search_bookmarks(
-            &mut conn,
-            Some(&format!("{}//", &folder1_path)),
-            None,
-            0,
-            100,
-        )
-        .await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 10);
+        let _ = setup_folders_and_bookmarks_default(&mut conn).await;
 
         info!("search bookmarks in root");
-        let rv = search_bookmarks(&mut conn, None, None, 0, 100).await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert!(rv.len() > 11);
+        assert_searched_bookmarks!(None, None, 13); // 11 + 1 + 1
 
         info!("search bookmarks in root only");
-        let rv = search_bookmarks(&mut conn, Some("//"), None, 0, 100).await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert!(rv.len() > 11);
+        assert_searched_bookmarks!(Some("//"), None, 1);
+    }
+
+    #[tokio::test]
+    async fn search_bookmarks_in_folders_from_cwd() {
+        let mut conn = connection::establish().await;
+
+        let SetupFoldersAndBookmarksDefaultReturn {
+            folder1_path,
+            folder2_path,
+            folder3_name,
+            ..
+        } = setup_folders_and_bookmarks_default(&mut conn).await;
 
         info!("search bookmarks with cwd");
-        let rv = search_bookmarks(&mut conn, None, Some(&folder1_path), 0, 100).await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 11);
+        assert_searched_bookmarks!(None, Some(&folder1_path), 11); // 10 + 1
 
-        info!("search bookmarks with cwd and relative path");
-        let rv = search_bookmarks(
-            &mut conn,
-            Some(&format!("./{}", folder3_name)),
-            Some(&folder1_path),
-            0,
-            100,
-        )
-        .await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 1);
+        let query = format!("./{}", folder3_name);
+        info!(?query, "search bookmarks with cwd and relative path");
+        assert_searched_bookmarks!(Some(&query), Some(&folder1_path), 1);
+
+        let query = format!("./{} | ./", folder3_name);
+        info!(?query, "search bookmarks with cwd and relative path");
+        assert_searched_bookmarks!(Some(&query), Some(&folder1_path), 11); // 1 + 10
+
+        let query = format!("./{} | .//", folder3_name);
+        info!(?query, "search bookmarks with cwd and relative path");
+        assert_searched_bookmarks!(Some(&query), Some(&folder1_path), 11); // 1 + 10
+
+        let query = ".//";
+        info!(?query, "search bookmarks with cwd and relative path");
+        assert_searched_bookmarks!(Some(&query), Some(&folder1_path), 10); // 10
 
         info!("search bookmarks with cwd but overwrite by absolute path");
-        let rv =
-            search_bookmarks(&mut conn, Some(&folder2_path), Some(&folder1_path), 0, 100).await;
-        info!(?rv, "searched bookmarks");
-        let rv = rv.unwrap();
-        assert_eq!(rv.len(), 1);
+        assert_searched_bookmarks!(Some(&folder2_path), Some(&folder1_path), 1);
     }
 }
