@@ -58,10 +58,10 @@ main() {
 		if [[ -z "${CI-}" ]]; then
 			echo ">>> Setting up the project development environment"
 			docker compose up -d --wait
-			echo "DATABASE_URL=postgres://postgres:example@localhost:5432/bearmark" >.env
+			echo "DATABASE_URL=postgres://postgres:example@${POSTGRES_HOST-localhost}:${POSTGRES_PORT-5432}/${POSTGRES_DB-bearmark}" >.env
 		else
 			echo ">>> Skip setting up the project development environment"
-			echo "DATABASE_URL=postgres://postgres:example@${POSTGRES_HOST-db}:${POSTGRES_PORT-5432}/bearmark" >.env
+			echo "DATABASE_URL=postgres://postgres:example@${POSTGRES_HOST-db}:${POSTGRES_PORT-5432}/${POSTGRES_DB-bearmark}" >.env
 		fi
 		echo ">>> Setting up database"
 		diesel migration run
@@ -73,7 +73,7 @@ main() {
 		echo ">>> Done"
 		;;
 	"db-console")
-		docker compose exec db psql -Upostgres
+		docker compose exec db psql -Upostgres ${POSTGRES_DB-bearmark}
 		;;
 	"serve")
 		echo ">>> Running the api server"

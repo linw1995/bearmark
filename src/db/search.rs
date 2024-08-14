@@ -1,4 +1,3 @@
-use diesel::dsl::LeftJoinQuerySource;
 use diesel::expression::BoxableExpression;
 use diesel::pg::Pg;
 use diesel::prelude::*;
@@ -32,14 +31,6 @@ fn parse_query<'a>(
     debug!(?rv, "parsed query");
     Ok(rv)
 }
-
-type BookmarkFilter = Box<
-    dyn BoxableExpression<
-        LeftJoinQuerySource<schema::bookmarks::table, schema::bookmarks_tags::table>,
-        Pg,
-        SqlType = Bool,
-    >,
->;
 
 fn join_folder_path(cwd: &str, p: &str) -> String {
     const PATH_SEP: char = '/';
@@ -85,7 +76,10 @@ macro_rules! find_bookmarks_in_path {
     }};
 }
 
-fn find_bookmarks(query: search::Query<'_>, cwd: &str) -> Result<BookmarkFilter, BearQLError> {
+fn find_bookmarks(
+    query: search::Query<'_>,
+    cwd: &str,
+) -> Result<Box<dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>>, BearQLError> {
     use super::schema::{bookmarks, bookmarks_tags, tags};
     use search::Primitive::*;
     use search::Query::*;
@@ -94,47 +88,53 @@ fn find_bookmarks(query: search::Query<'_>, cwd: &str) -> Result<BookmarkFilter,
         Or(a, b) => Box::new(find_bookmarks(*a, cwd)?.or(find_bookmarks(*b, cwd)?)),
         And(a, b) => Box::new(find_bookmarks(*a, cwd)?.and(find_bookmarks(*b, cwd)?)),
         Parenthesized(a) => find_bookmarks(*a, cwd)?,
-        Primitive(p) => match p {
-            Path(p) => {
-                let target = p.to_string();
-                let path = join_folder_path(cwd, &target);
-                debug!(?path, ?cwd, ?target, "searching in path");
-                if path == "/" {
-                    Box::new(bookmarks::dsl::id.eq(bookmarks::dsl::id)) // always true, no side effects
-                } else if path == "//" {
-                    Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
-                } else {
-                    find_bookmarks_in_path!(path)
+        Primitive(p) => {
+            match p {
+                Path(p) => {
+                    let target = p.to_string();
+                    let path = join_folder_path(cwd, &target);
+                    debug!(?path, ?cwd, ?target, "searching in path");
+                    if path == "/" {
+                        Box::new(bookmarks::dsl::id.eq(bookmarks::dsl::id)) // always true, no side effects
+                    } else if path == "//" {
+                        Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
+                    } else {
+                        find_bookmarks_in_path!(path)
+                    }
+                }
+                Tag(t) => {
+                    let t = t.to_string();
+                    let t = t.trim_start_matches('#').trim().to_string();
+                    if t.is_empty() {
+                        return Err(BearQLError::EmptyTag);
+                    }
+                    let bookmarks = diesel::alias!(bookmarks as bm);
+                    Box::new(
+                        bookmarks::dsl::id.eq_any(
+                            bookmarks
+                                .inner_join(bookmarks_tags::table)
+                                .filter(bookmarks_tags::dsl::tag_id.eq_any(
+                                    tags::table.filter(tags::dsl::name.eq(t)).select(tags::id),
+                                ))
+                                .select(bookmarks.fields(bookmarks::id))
+                                .distinct(),
+                        ),
+                    )
+                }
+                Keyword(k) => {
+                    let k = k.to_string();
+                    let k = k.trim().to_string();
+                    if k.is_empty() {
+                        return Err(BearQLError::EmptyKeyword);
+                    }
+                    Box::new(
+                        bookmarks::dsl::title
+                            .ilike(format!("%{}%", k))
+                            .or(bookmarks::dsl::url.ilike(format!("%{}%", k))),
+                    )
                 }
             }
-            Tag(t) => {
-                let t = t.to_string();
-                let t = t.trim_start_matches('#').trim().to_string();
-                if t.is_empty() {
-                    return Err(BearQLError::EmptyTag);
-                }
-                Box::new(
-                    // .nullable() is a dirty patch to make check pass, no side effects
-                    bookmarks_tags::dsl::tag_id.nullable().eq_any(
-                        tags::table
-                            .filter(tags::dsl::name.eq(t))
-                            .select(tags::id.nullable()),
-                    ),
-                )
-            }
-            Keyword(k) => {
-                let k = k.to_string();
-                let k = k.trim().to_string();
-                if k.is_empty() {
-                    return Err(BearQLError::EmptyKeyword);
-                }
-                Box::new(
-                    bookmarks::dsl::title
-                        .ilike(format!("%{}%", k))
-                        .or(bookmarks::dsl::url.ilike(format!("%{}%", k))),
-                )
-            }
-        },
+        }
     })
 }
 
@@ -165,18 +165,16 @@ async fn search_bookmarks_with_query(
     before: i32,
     limit: i64,
 ) -> Result<Vec<(Bookmark, Option<Folder>, Vec<Tag>)>, BearQLError> {
-    use super::schema::{bookmarks, bookmarks_tags};
+    use super::schema::bookmarks;
 
     let lst = if let Some(query) = query {
         let cwd = cwd.unwrap_or("/");
         let mut builder = bookmarks::table
-            .left_join(bookmarks_tags::table)
             .select(Bookmark::as_select())
             .distinct_on(bookmarks::id)
             .filter(bookmarks::dsl::deleted_at.is_null())
             .filter(find_bookmarks(query, cwd)?)
             .into_boxed();
-
         if before > 0 {
             builder = builder.filter(bookmarks::dsl::id.lt(before));
         }
@@ -533,6 +531,11 @@ pub(crate) mod test {
         assert_eq!(rv.len(), 1);
 
         let rv = search_bookmarks(&mut conn, Some("Weather #west"), None, 0, 10).await;
+        info!(?rv, "searched bookmarks with tag");
+        let rv = rv.unwrap();
+        assert_eq!(rv.len(), 1);
+
+        let rv = search_bookmarks(&mut conn, Some("#weather #global"), None, 0, 10).await;
         info!(?rv, "searched bookmarks with tag");
         let rv = rv.unwrap();
         assert_eq!(rv.len(), 1);
