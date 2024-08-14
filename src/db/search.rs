@@ -167,50 +167,35 @@ async fn search_bookmarks_with_query(
 ) -> Result<Vec<(Bookmark, Option<Folder>, Vec<Tag>)>, BearQLError> {
     use super::schema::bookmarks;
 
-    let lst = if let Some(query) = query {
+    let mut builder = bookmarks::table
+        .select(Bookmark::as_select())
+        .distinct_on(bookmarks::id)
+        .filter(bookmarks::dsl::deleted_at.is_null())
+        .into_boxed();
+    if let Some(query) = query {
         let cwd = cwd.unwrap_or("/");
-        let mut builder = bookmarks::table
-            .select(Bookmark::as_select())
-            .distinct_on(bookmarks::id)
-            .filter(bookmarks::dsl::deleted_at.is_null())
-            .filter(find_bookmarks(query, cwd)?)
-            .into_boxed();
-        if before > 0 {
-            builder = builder.filter(bookmarks::dsl::id.lt(before));
+        builder = builder.filter(find_bookmarks(query, cwd)?)
+    } else if let Some(cwd) = cwd {
+        if cwd != "/" {
+            let expression: Box<
+                dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>,
+            > = if cwd == "//" {
+                Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
+            } else {
+                find_bookmarks_in_path!(cwd)
+            };
+            builder = builder.filter(expression);
         }
-        builder
-            .order_by(bookmarks::id.desc())
-            .limit(limit)
-            .load::<Bookmark>(conn)
-            .await
-            .expect("Error loading bookmarks")
-    } else {
-        let mut query = bookmarks::table
-            .select(Bookmark::as_select())
-            .filter(bookmarks::dsl::deleted_at.is_null())
-            .into_boxed();
-        if let Some(cwd) = cwd {
-            if cwd != "/" {
-                let expression: Box<
-                    dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>,
-                > = if cwd == "//" {
-                    Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
-                } else {
-                    find_bookmarks_in_path!(cwd)
-                };
-                query = query.filter(expression);
-            }
-        }
-        if before > 0 {
-            query = query.filter(bookmarks::dsl::id.lt(before));
-        }
-        query
-            .order_by(bookmarks::id.desc())
-            .limit(limit)
-            .load::<Bookmark>(conn)
-            .await
-            .expect("Error loading bookmarks")
-    };
+    }
+    if before > 0 {
+        builder = builder.filter(bookmarks::dsl::id.lt(before));
+    }
+    let lst = builder
+        .order_by(bookmarks::id.desc())
+        .limit(limit)
+        .load::<Bookmark>(conn)
+        .await
+        .expect("Error loading bookmarks");
 
     if lst.is_empty() {
         return Ok(vec![]);
