@@ -1,5 +1,6 @@
 use super::errors::Error;
 use super::fairings::db::Db;
+use crate::api::guards;
 use crate::db::{
     bookmark::Bookmark,
     folder::{self, Folder},
@@ -19,6 +20,7 @@ pub struct NewFolder {
 #[post("/", format = "application/json", data = "<payload>")]
 pub async fn create_folder(
     mut db: Connection<Db>,
+    _required: guards::Auth,
     payload: Json<NewFolder>,
 ) -> Result<Json<Folder>, Error> {
     let path = payload.into_inner().path;
@@ -44,12 +46,21 @@ pub async fn create_folder(
 }
 
 #[get("/?<cwd>")]
-pub async fn list_folders(mut db: Connection<Db>, cwd: Option<&str>) -> Json<Vec<Folder>> {
+pub async fn list_folders(
+    mut db: Connection<Db>,
+    _required: guards::Auth,
+    cwd: Option<&str>,
+) -> Json<Vec<Folder>> {
     Json(folder::list_folders(&mut db, cwd.unwrap_or_default()).await)
 }
 
 #[put("/move_in/<bookmark_id>/<id>")]
-pub async fn move_bookmark(mut db: Connection<Db>, bookmark_id: i32, id: i32) -> Result<(), Error> {
+pub async fn move_bookmark(
+    mut db: Connection<Db>,
+    _required: guards::Auth,
+    bookmark_id: i32,
+    id: i32,
+) -> Result<(), Error> {
     let b = Bookmark::get(&mut db, bookmark_id)
         .await
         .ok_or(Error::NotFound("Bookmark not found".to_string()))?;
@@ -70,7 +81,11 @@ pub async fn move_bookmark(mut db: Connection<Db>, bookmark_id: i32, id: i32) ->
 }
 
 #[put("/move_out/<bookmark_id>")]
-pub async fn move_out_bookmark(mut db: Connection<Db>, bookmark_id: i32) -> Result<(), Error> {
+pub async fn move_out_bookmark(
+    mut db: Connection<Db>,
+    _required: guards::Auth,
+    bookmark_id: i32,
+) -> Result<(), Error> {
     let folder_id = Bookmark::get(&mut db, bookmark_id)
         .await
         .ok_or(Error::NotFound("Bookmark not found".to_string()))?
@@ -93,25 +108,32 @@ pub fn routes() -> Vec<rocket::Route> {
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
+    use crate::api::configs::Config;
     use crate::db::bookmark::test::create_rand_bookmark;
     use crate::db::connection;
     use crate::db::folder::test::create_rand_folder;
     use crate::utils::rand::rand_str;
 
+    use rocket::fairing::AdHoc;
     use rocket::http::Status;
     use rocket::local::asynchronous;
     use rocket::local::blocking;
     use rocket_db_pools::Database;
     use tracing::info;
 
+    fn test_app() -> rocket::Rocket<rocket::Build> {
+        rocket::build()
+            .attach(Db::init())
+            .mount("/", routes())
+            .attach(AdHoc::config::<Config>())
+    }
+
     fn test_client() -> blocking::Client {
-        let app = rocket::build().attach(Db::init()).mount("/", routes());
-        blocking::Client::tracked(app).expect("valid rocket instance")
+        blocking::Client::tracked(test_app()).expect("valid rocket instance")
     }
 
     async fn test_async_client() -> asynchronous::Client {
-        let app = rocket::build().attach(Db::init()).mount("/", routes());
-        asynchronous::Client::tracked(app)
+        asynchronous::Client::tracked(test_app())
             .await
             .expect("valid rocket instance")
     }

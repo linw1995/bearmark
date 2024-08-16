@@ -1,5 +1,6 @@
 use super::errors::Error;
 use super::fairings::db::Db;
+use super::guards;
 use crate::db::{self, bookmark, folder, tag};
 
 use diesel_async::scoped_futures::ScopedFutureExt;
@@ -35,6 +36,7 @@ pub struct Bookmark {
 #[post("/", format = "application/json", data = "<payload>")]
 pub async fn create_bookmark(
     mut db: Connection<Db>,
+    _required: guards::Auth,
     payload: Json<CreateBookmarkPayload>,
 ) -> Result<Json<Bookmark>, Error> {
     let payload = payload.into_inner();
@@ -77,6 +79,7 @@ pub async fn create_bookmark(
 #[get("/?<q>&<cwd>&<before>&<limit>")]
 pub async fn search_bookmarks(
     mut db: Connection<Db>,
+    _required: guards::Auth,
     q: Option<&str>,
     cwd: Option<&str>,
     before: Option<i32>,
@@ -109,7 +112,11 @@ pub async fn search_bookmarks(
 }
 
 #[delete("/<id>")]
-pub async fn delete_bookmark(mut db: Connection<Db>, id: i32) -> Result<&'static str, Error> {
+pub async fn delete_bookmark(
+    mut db: Connection<Db>,
+    _required: guards::Auth,
+    id: i32,
+) -> Result<&'static str, Error> {
     let effected = bookmark::delete_bookmarks(&mut db, vec![id]).await == 1;
     if effected {
         Ok("Deleted")
@@ -128,6 +135,7 @@ pub struct ModifyBookmark {
 #[patch("/<id>", format = "application/json", data = "<payload>")]
 pub async fn update_bookmark(
     mut db: Connection<Db>,
+    _required: guards::Auth,
     id: i32,
     payload: Json<ModifyBookmark>,
 ) -> Result<Json<Bookmark>, Error> {
@@ -193,19 +201,32 @@ pub fn routes() -> Vec<rocket::Route> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::api::configs::Config;
     use crate::db::bookmark::test::rand_bookmark;
     use crate::utils::rand::rand_str;
 
     use itertools::Itertools;
+    use rocket::fairing::AdHoc;
     use rocket::http::Status;
-    use rocket::local::blocking::Client;
+    use rocket::local::{asynchronous, blocking};
     use rocket_db_pools::Database;
     use tracing::info;
 
-    fn test_client() -> Client {
-        let app = rocket::build().attach(Db::init()).mount("/", routes());
-        let client = Client::tracked(app).expect("valid rocket instance");
-        return client;
+    fn test_app() -> rocket::Rocket<rocket::Build> {
+        rocket::build()
+            .attach(Db::init())
+            .mount("/", routes())
+            .attach(AdHoc::config::<Config>())
+    }
+
+    fn test_client() -> blocking::Client {
+        blocking::Client::tracked(test_app()).expect("valid rocket instance")
+    }
+
+    async fn test_async_client() -> asynchronous::Client {
+        asynchronous::Client::tracked(test_app())
+            .await
+            .expect("valid rocket instance")
     }
 
     #[test]
@@ -258,14 +279,11 @@ mod test {
 
     #[rocket::async_test]
     async fn search_bookmarks() {
-        use rocket::local::asynchronous::Client;
-
         // Create some bookmarks
         let mut conn = crate::db::connection::establish().await;
         crate::db::search::test::setup_searchable_bookmarks(&mut conn).await;
 
-        let app = rocket::build().attach(Db::init()).mount("/", routes());
-        let client = Client::tracked(app).await.expect("valid rocket instance");
+        let client = test_async_client().await;
         let mut results: Vec<Bookmark>;
 
         macro_rules! assert_get_bookmarks {

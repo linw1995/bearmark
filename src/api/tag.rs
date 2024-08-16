@@ -1,5 +1,6 @@
 use super::errors::Error;
 use super::fairings::db::Db;
+use crate::api::guards;
 use crate::db::tag::{self, Tag};
 
 use rocket::serde::json::Json;
@@ -8,6 +9,7 @@ use rocket_db_pools::Connection;
 #[get("/?<q>&<before>&<limit>")]
 pub async fn search_tags(
     mut db: Connection<Db>,
+    _required: guards::Auth,
     q: Option<&str>,
     before: Option<i32>,
     limit: Option<i64>,
@@ -25,7 +27,11 @@ pub async fn search_tags(
 }
 
 #[delete("/<id>")]
-pub async fn delete_tag(mut db: Connection<Db>, id: i32) -> Result<&'static str, Error> {
+pub async fn delete_tag(
+    mut db: Connection<Db>,
+    _required: guards::Auth,
+    id: i32,
+) -> Result<&'static str, Error> {
     let effected = tag::delete_tags(&mut db, vec![id]).await == 1;
     if effected {
         Ok("Deleted")
@@ -37,6 +43,7 @@ pub async fn delete_tag(mut db: Connection<Db>, id: i32) -> Result<&'static str,
 #[patch("/<id>", format = "application/json", data = "<payload>")]
 pub async fn update_tag(
     mut db: Connection<Db>,
+    _required: guards::Auth,
     id: i32,
     payload: Json<tag::ModifyTag>,
 ) -> Result<Json<Tag>, Error> {
