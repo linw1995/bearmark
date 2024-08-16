@@ -1,6 +1,6 @@
 use crate::utils::{BearQLError, DatabaseError};
 
-#[derive(Responder)]
+#[derive(Responder, Debug)]
 pub enum Error {
     #[response(status = 404)]
     NotFound(String),
@@ -8,6 +8,11 @@ pub enum Error {
     BadRequest(String),
     #[response(status = 500)]
     InternalServer(String),
+
+    #[response(status = 401)]
+    MissingAPIKey(String),
+    #[response(status = 403)]
+    InvalidAPIKey(String),
 }
 
 impl From<DatabaseError> for Error {
