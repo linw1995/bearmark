@@ -1,6 +1,6 @@
-use rocket::serde::Deserialize;
+use rocket::serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(crate = "rocket::serde")]
 pub struct Config {
     pub api_key: Option<String>,
