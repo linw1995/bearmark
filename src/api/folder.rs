@@ -190,14 +190,16 @@ pub(crate) mod test {
         assert_eq!(res.status(), Status::Ok);
         assert_eq!(res.into_json::<Folder>().unwrap().path, path);
 
-        let res = client.get("/").dispatch();
+        let res = client.get(uri!(super::list_folders(cwd = _))).dispatch();
         assert_eq!(res.status(), Status::Ok);
         let folders: Vec<Folder> = res.into_json().unwrap();
         assert!(folders.len() > 0);
         assert!(folders.iter().any(|f| f.path == parent_path));
         assert!(folders.iter().all(|f| f.path != path));
 
-        let res = client.get(format!("/?cwd={}", parent_path)).dispatch();
+        let res = client
+            .get(uri!(super::list_folders(cwd = Some(parent_path))))
+            .dispatch();
         assert_eq!(res.status(), Status::Ok);
         let folders: Vec<Folder> = res.into_json().unwrap();
         assert_eq!(folders.len(), 1);
@@ -233,11 +235,17 @@ pub(crate) mod test {
         assert_eq!(res.status(), Status::Ok);
 
         // move out
-        let res = client.put(format!("/move_out/{}", bm.id)).dispatch().await;
+        let res = client
+            .put(uri!(super::move_out_bookmark(bm.id)))
+            .dispatch()
+            .await;
         assert_eq!(res.status(), Status::Ok);
 
         // move out again
-        let res = client.put(format!("/move_out/{}", bm.id)).dispatch().await;
+        let res = client
+            .put(uri!(super::move_out_bookmark(bm.id)))
+            .dispatch()
+            .await;
         assert_eq!(res.status(), Status::BadRequest);
     }
 }

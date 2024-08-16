@@ -194,7 +194,6 @@ pub fn routes() -> Vec<rocket::Route> {
 mod test {
     use super::*;
     use crate::db::bookmark::test::rand_bookmark;
-    use crate::utils::percent_encoding;
     use crate::utils::rand::rand_str;
 
     use itertools::Itertools;
@@ -246,10 +245,14 @@ mod test {
         assert_eq!(response.status(), Status::Ok);
         let added: Bookmark = response.into_json().unwrap();
 
-        let response = client.delete(format!("/{}", added.id)).dispatch();
+        let response = client
+            .delete(uri!(super::delete_bookmark(added.id)))
+            .dispatch();
         assert_eq!(response.status(), Status::Ok);
 
-        let response = client.delete(format!("/{}", added.id)).dispatch();
+        let response = client
+            .delete(uri!(super::delete_bookmark(added.id)))
+            .dispatch();
         assert_eq!(response.status(), Status::NotFound);
     }
 
@@ -277,72 +280,118 @@ mod test {
         }
 
         assert_get_bookmarks!(
-            "/",
+            uri!(super::search_bookmarks(
+                q = _,
+                cwd = _,
+                before = _,
+                limit = _
+            )),
             results.len() >= 5,
             "Expected more than 5 bookmarks, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            "/?q=Weather",
+            uri!(super::search_bookmarks(
+                q = Some("Weather"),
+                cwd = _,
+                before = _,
+                limit = _
+            )),
             results.len() == 3,
             "Expected 3 bookmarks, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            "/?q=Weather&limit=2",
+            uri!(super::search_bookmarks(
+                q = Some("Weather"),
+                cwd = _,
+                before = _,
+                limit = Some(2)
+            )),
             results.len() == 2,
             "Expected 2 bookmarks, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            format!("/?q=Weather&before={}&limit=2", results[1].id),
+            uri!(super::search_bookmarks(
+                q = Some("Weather"),
+                cwd = _,
+                before = Some(results[1].id),
+                limit = Some(2)
+            )),
             results.len() == 1,
             "Expected 1 bookmark, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            format!("/?q={}", percent_encoding("#global weather")),
+            uri!(super::search_bookmarks(
+                q = Some("#global weather"),
+                cwd = _,
+                before = _,
+                limit = _
+            )),
             results.len() == 1,
             "Expected 1 bookmark, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            format!("/?q={}", percent_encoding("#west weather")),
+            uri!(super::search_bookmarks(
+                q = Some("#west weather"),
+                cwd = _,
+                before = _,
+                limit = _
+            )),
             results.len() == 1,
             "Expected 1 bookmark, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            format!("/?q={}", percent_encoding("#global #west weather")),
+            uri!(super::search_bookmarks(
+                q = Some("#global #west weather"),
+                cwd = _,
+                before = _,
+                limit = _
+            )),
             results.len() == 0,
             "Expected 0 bookmark, got {}",
             results.len()
         );
 
         assert_get_bookmarks!(
-            format!("/?q={}", percent_encoding("#weather")),
+            uri!(super::search_bookmarks(
+                q = Some("#weather"),
+                cwd = _,
+                before = _,
+                limit = _
+            )),
             results.len() == 3,
             "Expected 3 bookmarks, got {}",
             results.len()
         );
         assert_get_bookmarks!(
-            format!("/?q={}&limit=1", percent_encoding("#weather")),
+            uri!(super::search_bookmarks(
+                q = Some("#weather"),
+                cwd = _,
+                before = _,
+                limit = Some(1)
+            )),
             results.len() == 1,
             "Expected 1 bookmark, got {}",
             results.len()
         );
         assert_get_bookmarks!(
-            format!(
-                "/?q={}&limit=3&before={}",
-                percent_encoding("#weather"),
-                results[0].id
-            ),
+            uri!(super::search_bookmarks(
+                q = Some("#weather"),
+                cwd = _,
+                before = Some(results[0].id),
+                limit = Some(3)
+            )),
             results.len() == 2,
             "Expected 2 bookmarks, got {}",
             results.len()
@@ -373,7 +422,14 @@ mod test {
 
         macro_rules! assert_get_bookmark {
             ($($assert_args:expr),*) => {
-                let response = client.get(format!("/?q={}", title)).dispatch();
+                let response = client.get(
+                    uri!(super::search_bookmarks(
+                        q = Some(&title),
+                        cwd = _,
+                        before = _,
+                        limit = _
+                    ))
+                ).dispatch();
                 assert_eq!(response.status(), Status::Ok);
                 results = response.into_json().unwrap();
                 assert!(
@@ -388,7 +444,9 @@ mod test {
             results.len()
         );
 
-        let response = client.delete(format!("/{}", added.id)).dispatch();
+        let response = client
+            .delete(uri!(super::delete_bookmark(id = added.id)))
+            .dispatch();
         assert_eq!(response.status(), Status::Ok);
 
         assert_get_bookmark!(
@@ -424,7 +482,7 @@ mod test {
         assert_ne!(Some(added.url), payload.url);
 
         let response = client
-            .patch(format!("/{}", added.id))
+            .patch(uri!(super::update_bookmark(added.id)))
             .json(&payload)
             .dispatch();
         assert_eq!(response.status(), Status::Ok);
@@ -444,7 +502,10 @@ mod test {
             tags: None,
         };
 
-        let response = client.put("/99999999").json(&payload).dispatch();
+        let response = client
+            .patch(uri!(super::update_bookmark(99999999)))
+            .json(&payload)
+            .dispatch();
         assert_eq!(response.status(), Status::NotFound);
     }
 
@@ -471,7 +532,7 @@ mod test {
             tags: None,
         };
         let response = client
-            .patch(format!("/{}", added.id))
+            .patch(uri!(super::update_bookmark(added.id)))
             .json(&payload)
             .dispatch();
         assert_eq!(response.status(), Status::BadRequest);
@@ -508,7 +569,7 @@ mod test {
         };
 
         let response = client
-            .patch(format!("/{}", added.id))
+            .patch(uri!(super::update_bookmark(added.id)))
             .json(&payload)
             .dispatch();
         assert_eq!(response.status(), Status::Ok);
