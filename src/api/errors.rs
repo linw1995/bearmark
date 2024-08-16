@@ -1,4 +1,4 @@
-use crate::utils::{BearQLError, DatabaseError};
+use crate::utils::{BearQLError, CommonError, DatabaseError};
 
 #[derive(Responder, Debug)]
 pub enum Error {
@@ -41,5 +41,14 @@ impl From<BearQLError> for Error {
 impl From<diesel::result::Error> for Error {
     fn from(e: diesel::result::Error) -> Self {
         Error::InternalServer(e.to_string())
+    }
+}
+
+impl From<CommonError> for Error {
+    fn from(e: CommonError) -> Self {
+        match e {
+            CommonError::InvalidCWD => Error::BadRequest("Invalid CWD".to_string()),
+            CommonError::BearQL(e) => Error::from(e),
+        }
     }
 }

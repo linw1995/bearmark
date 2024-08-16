@@ -11,7 +11,7 @@ use super::folder::Folder;
 use super::tag::Tag;
 use crate::db::schema;
 use crate::utils::search;
-use crate::utils::BearQLError;
+use crate::utils::{BearQLError, CommonError};
 
 fn parse_query<'a>(
     raw: &'a str,
@@ -46,40 +46,40 @@ fn join_folder_path(cwd: &str, p: &str) -> String {
     }
 }
 
-macro_rules! find_bookmarks_in_path {
-    ($p: expr) => {{
-        use super::schema::{bookmarks, folders};
+fn find_bookmarks_in_path(
+    p: &str,
+) -> Result<Box<dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>>, CommonError> {
+    use super::schema::{bookmarks, folders};
 
-        let p = $p;
-        let without_descendants = p.ends_with("//");
-        let p = p.trim_end_matches('/').to_string(); // remove trailing slashes
+    let without_descendants = p.ends_with("//");
+    let p = p.trim_end_matches('/').to_string(); // remove trailing slashes
 
-        let expression: Box<dyn BoxableExpression<_, _, SqlType = Bool>> = if without_descendants {
-            // special syntax. search bookmarks in the folder only
-            Box::new(folders::dsl::path.eq(p))
-        } else {
-            // search bookmarks in the folder and its descendants
-            Box::new(
-                folders::dsl::path
-                    .like(format!("{}/%", p))
-                    .or(folders::dsl::path.eq(p)),
-            )
-        };
+    if p.is_empty() {
+        return Err(CommonError::InvalidCWD);
+    }
+
+    let expression: Box<dyn BoxableExpression<_, _, SqlType = Bool>> = if without_descendants {
+        // special syntax. search bookmarks in the folder only
+        Box::new(folders::dsl::path.eq(p))
+    } else {
+        // search bookmarks in the folder and its descendants
         Box::new(
-            bookmarks::dsl::folder_id.eq_any(
-                folders::table
-                    .filter(expression)
-                    .select(folders::id.nullable(), // .nullable() is a dirty patch to make check pass, no side effects
-                ),
-            ),
+            folders::dsl::path
+                .like(format!("{}/%", p))
+                .or(folders::dsl::path.eq(p)),
         )
-    }};
+    };
+    Ok(Box::new(bookmarks::dsl::folder_id.eq_any(
+        folders::table.filter(expression).select(
+            folders::id.nullable(), // .nullable() is a dirty patch to make check pass, no side effects
+        ),
+    )))
 }
 
 fn find_bookmarks(
     query: search::Query<'_>,
     cwd: &str,
-) -> Result<Box<dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>>, BearQLError> {
+) -> Result<Box<dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>>, CommonError> {
     use super::schema::{bookmarks, bookmarks_tags, tags};
     use search::Primitive::*;
     use search::Query::*;
@@ -99,14 +99,14 @@ fn find_bookmarks(
                     } else if path == "//" {
                         Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
                     } else {
-                        find_bookmarks_in_path!(path)
+                        find_bookmarks_in_path(&path)?
                     }
                 }
                 Tag(t) => {
                     let t = t.to_string();
                     let t = t.trim_start_matches('#').trim().to_string();
                     if t.is_empty() {
-                        return Err(BearQLError::EmptyTag);
+                        return Err(CommonError::BearQL(BearQLError::EmptyTag));
                     }
                     let bookmarks = diesel::alias!(bookmarks as bm);
                     Box::new(
@@ -125,7 +125,7 @@ fn find_bookmarks(
                     let k = k.to_string();
                     let k = k.trim().to_string();
                     if k.is_empty() {
-                        return Err(BearQLError::EmptyKeyword);
+                        return Err(CommonError::BearQL(BearQLError::EmptyKeyword));
                     }
                     Box::new(
                         bookmarks::dsl::title
@@ -144,7 +144,7 @@ pub async fn search_bookmarks(
     cwd: Option<&str>,
     before: i32,
     limit: i64,
-) -> Result<Vec<(Bookmark, Option<Folder>, Vec<Tag>)>, BearQLError> {
+) -> Result<Vec<(Bookmark, Option<Folder>, Vec<Tag>)>, CommonError> {
     if let Some(query) = query {
         let out_arena = Arena::new();
         let err_arena = Arena::new();
@@ -164,7 +164,7 @@ async fn search_bookmarks_with_query(
     cwd: Option<&str>,
     before: i32,
     limit: i64,
-) -> Result<Vec<(Bookmark, Option<Folder>, Vec<Tag>)>, BearQLError> {
+) -> Result<Vec<(Bookmark, Option<Folder>, Vec<Tag>)>, CommonError> {
     use super::schema::bookmarks;
 
     let mut builder = bookmarks::table
@@ -177,12 +177,10 @@ async fn search_bookmarks_with_query(
         builder = builder.filter(find_bookmarks(query, cwd)?)
     } else if let Some(cwd) = cwd {
         if cwd != "/" {
-            let expression: Box<
-                dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>,
-            > = if cwd == "//" {
+            let expression = if cwd == "//" {
                 Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
             } else {
-                find_bookmarks_in_path!(cwd)
+                find_bookmarks_in_path(cwd)?
             };
             builder = builder.filter(expression);
         }
@@ -675,7 +673,16 @@ pub(crate) mod test {
         assert_searched_bookmarks!(Some(&query), None, 11);
     }
 
-    // #[ignore = "need to access DB exclusively"]
+    #[tokio::test]
+    async fn search_bookmarks_with_invalid_cwd() {
+        let mut conn = connection::establish().await;
+        let rv = search_bookmarks(&mut conn, None, Some("///"), 0, 100).await;
+        info!(?rv, "searched bookmarks");
+        assert!(rv.is_err());
+        let rv = rv.unwrap_err();
+        assert!(matches!(rv, CommonError::InvalidCWD));
+    }
+
     #[tokio::test]
     async fn search_bookmarks_in_root() {
         let mut conn = connection::establish().await;
