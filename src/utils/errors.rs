@@ -21,3 +21,12 @@ pub enum BearQLError {
     #[error("Empty keyword error")]
     EmptyKeyword,
 }
+
+#[derive(Error, Debug)]
+pub enum CommonError {
+    #[error("Invalid CWD")]
+    InvalidCWD,
+
+    #[error(transparent)]
+    BearQL(#[from] BearQLError),
+}
