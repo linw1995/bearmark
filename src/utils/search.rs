@@ -175,7 +175,7 @@ mod test {
 
     fn parse_query<'a>(raw: &'a str, out_arena: &'a Arena, err_arena: &'a Arena) -> Query<'a> {
         let source = Source::new(raw);
-        let rv = parse::<Query>(source, &out_arena, &err_arena);
+        let rv = parse::<Query>(source, out_arena, err_arena);
         debug!(?rv, ?source, "parsed");
         assert!(rv.is_ok());
         rv.unwrap()
@@ -186,7 +186,7 @@ mod test {
         let out_arena = Arena::new();
         let err_arena = Arena::new();
 
-        for src in vec![
+        for src in [
             r#"/cs/pl/rust title #rust"#,
             r#"/cs/pl title #rust"#,
             r#"/cs title #rust"#,
@@ -196,7 +196,7 @@ mod test {
             r#"title ( #rust | #langs )"#,
             r#"/blog/"#,
         ] {
-            let rv = parse_query(&src, &out_arena, &err_arena);
+            let rv = parse_query(src, &out_arena, &err_arena);
             info!(?rv, ?src, "parsed");
         }
     }

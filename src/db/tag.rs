@@ -207,7 +207,7 @@ pub mod tests {
         assert_eq!(bookmark.id, new.id);
         assert!(tags.is_empty());
 
-        let tag_names = vec![rand_str(4), rand_str(4)]
+        let tag_names = [rand_str(4), rand_str(4)]
             .iter()
             .sorted()
             .map(|i| i.to_string())
@@ -222,10 +222,7 @@ pub mod tests {
         assert_eq!(bookmark.id, new.id);
         assert_eq!(tags.len(), 2);
         assert_eq!(
-            tags.into_iter()
-                .map(|t| t.name.clone())
-                .sorted()
-                .collect_vec(),
+            tags.iter().map(|t| t.name.clone()).sorted().collect_vec(),
             tag_names
         );
     }

@@ -376,7 +376,7 @@ mod test {
                 before = _,
                 limit = _
             )),
-            results.len() == 0,
+            results.is_empty(),
             "Expected 0 bookmark, got {}",
             results.len()
         );
@@ -468,7 +468,7 @@ mod test {
         assert_eq!(response.status(), Status::Ok);
 
         assert_get_bookmark!(
-            results.len() == 0,
+            results.is_empty(),
             "Expected 0 bookmarks, got {}",
             results.len()
         );

@@ -139,7 +139,7 @@ pub(crate) mod test {
             .await
             .expect("Error loading bookmarks");
 
-        assert!(results.len() > 0);
+        assert!(!results.is_empty());
         info!("{:?}", results[0]);
     }
 
