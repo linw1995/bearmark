@@ -215,7 +215,7 @@ pub(crate) mod test {
         let res = client.get(uri!(super::list_folders(cwd = _))).dispatch();
         assert_eq!(res.status(), Status::Ok);
         let folders: Vec<Folder> = res.into_json().unwrap();
-        assert!(folders.is_empty());
+        assert!(!folders.is_empty());
         assert!(folders.iter().any(|f| f.path == parent_path));
         assert!(folders.iter().all(|f| f.path != path));
 

@@ -52,13 +52,17 @@ main() {
     if [[ -z "${CI-}" ]]; then
       echo ">>> Setting up the project development environment"
       docker compose up -d --wait
+
       echo "DATABASE_URL=postgres://postgres:example@${POSTGRES_HOST-localhost}:${POSTGRES_PORT-5432}/${POSTGRES_DB-bearmark}" >.env
+      echo ">>> Setting up database"
+      ./scripts/bin/diesel migration run
     else
       echo ">>> Skip setting up the project development environment"
+
       echo "DATABASE_URL=postgres://postgres:example@${POSTGRES_HOST-db}:${POSTGRES_PORT-5432}/${POSTGRES_DB-bearmark}" >.env
+      echo ">>> Setting up database"
+      diesel migration run
     fi
-    echo ">>> Setting up database"
-    ./scripts/bin/diesel migration run
     echo ">>> Done"
     ;;
   "teardown")
@@ -80,7 +84,11 @@ main() {
     ;;
   "coverage")
     echo ">>> Running tests with coverage"
-    ./scripts/bin/cargo-tarpaulin --out html --skip-clean -- --show-output --test-threads 1 "$@"
+    if [[ -z "${CI-}" ]]; then
+      ./scripts/bin/cargo-tarpaulin --out html --skip-clean -- --show-output --test-threads 1 "$@"
+    else
+      cargo tarpaulin --out html --skip-clean -- --show-output --test-threads 1 "$@"
+    fi
     echo "open file ./tarpaulin-report.html to see coverage report"
     cleanup_profraw_files
     ;;
