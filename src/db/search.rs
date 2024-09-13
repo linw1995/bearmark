@@ -738,7 +738,7 @@ pub(crate) mod test {
 
         let query = ".//";
         info!(?query, "search bookmarks with cwd and relative path");
-        assert_searched_bookmarks!(Some(&query), Some(&folder1_path), 10); // 10
+        assert_searched_bookmarks!(Some(query), Some(&folder1_path), 10); // 10
 
         info!("search bookmarks with cwd but overwrite by absolute path");
         assert_searched_bookmarks!(Some(&folder2_path), Some(&folder1_path), 1);

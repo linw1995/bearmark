@@ -23,3 +23,8 @@ tarpaulin-report.html
 cobertura.xml
 .zed
 static
+.direnv
+
+scripts/bin
+scripts/.crates.toml
+scripts/.crates2.json
