@@ -79,20 +79,30 @@ fn find_bookmarks_in_path(
 fn find_bookmarks(
     query: search::Query<'_>,
     cwd: &str,
+    cwd_overwrited: &mut bool,
 ) -> Result<Box<dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>>, CommonError> {
     use super::schema::{bookmarks, bookmarks_tags, tags};
     use search::Primitive::*;
     use search::Query::*;
 
     Ok(match query {
-        Or(a, b) => Box::new(find_bookmarks(*a, cwd)?.or(find_bookmarks(*b, cwd)?)),
-        And(a, b) => Box::new(find_bookmarks(*a, cwd)?.and(find_bookmarks(*b, cwd)?)),
-        Parenthesized(a) => find_bookmarks(*a, cwd)?,
+        Or(a, b) => Box::new(find_bookmarks(*a, cwd, cwd_overwrited)?.or(find_bookmarks(
+            *b,
+            cwd,
+            cwd_overwrited,
+        )?)),
+        And(a, b) => Box::new(find_bookmarks(*a, cwd, cwd_overwrited)?.and(find_bookmarks(
+            *b,
+            cwd,
+            cwd_overwrited,
+        )?)),
+        Parenthesized(a) => find_bookmarks(*a, cwd, cwd_overwrited)?,
         Primitive(p) => {
             match p {
                 Path(p) => {
                     let target = p.to_string();
                     let path = join_folder_path(cwd, &target);
+                    *cwd_overwrited = true;
                     debug!(?path, ?cwd, ?target, "searching in path");
                     if path == "/" {
                         Box::new(bookmarks::dsl::id.eq(bookmarks::dsl::id)) // always true, no side effects
@@ -172,17 +182,21 @@ async fn search_bookmarks_with_query(
         .distinct_on(bookmarks::id)
         .filter(bookmarks::dsl::deleted_at.is_null())
         .into_boxed();
+    let mut cwd_overwrited = false;
     if let Some(query) = query {
         let cwd = cwd.unwrap_or("/");
-        builder = builder.filter(find_bookmarks(query, cwd)?)
-    } else if let Some(cwd) = cwd {
-        if cwd != "/" {
-            let expression = if cwd == "//" {
-                Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
-            } else {
-                find_bookmarks_in_path(cwd)?
-            };
-            builder = builder.filter(expression);
+        builder = builder.filter(find_bookmarks(query, cwd, &mut cwd_overwrited)?)
+    }
+    if !cwd_overwrited {
+        if let Some(cwd) = cwd {
+            if cwd != "/" {
+                let expression = if cwd == "//" {
+                    Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
+                } else {
+                    find_bookmarks_in_path(cwd)?
+                };
+                builder = builder.filter(expression);
+            }
         }
     }
     if before > 0 {
@@ -578,6 +592,7 @@ pub(crate) mod test {
     struct SetupFoldersAndBookmarksDefaultReturn {
         folder1_path: String,
         folder2_path: String,
+        folder2_id: i32,
         folder3_name: String,
     }
 
@@ -600,9 +615,12 @@ pub(crate) mod test {
         .await
         .unwrap();
 
+        let folder2 = Folder::get_by_path(conn, &folder2_path).await.unwrap();
+
         SetupFoldersAndBookmarksDefaultReturn {
             folder1_path,
             folder2_path,
+            folder2_id: folder2.id,
             folder3_name,
         }
     }
@@ -717,12 +735,14 @@ pub(crate) mod test {
         let SetupFoldersAndBookmarksDefaultReturn {
             folder1_path,
             folder2_path,
+            folder2_id,
             folder3_name,
             ..
         } = setup_folders_and_bookmarks_default(&mut conn).await;
 
         info!("search bookmarks with cwd");
         assert_searched_bookmarks!(None, Some(&folder1_path), 11); // 10 + 1
+        assert_searched_bookmarks!(None, Some(&folder2_path), 1);
 
         let query = format!("./{}", folder3_name);
         info!(?query, "search bookmarks with cwd and relative path");
@@ -742,5 +762,15 @@ pub(crate) mod test {
 
         info!("search bookmarks with cwd but overwrite by absolute path");
         assert_searched_bookmarks!(Some(&folder2_path), Some(&folder1_path), 1);
+
+        info!("search bookmark not in cwd");
+        let bookmark = create_rand_bookmark(&mut conn).await;
+        assert_searched_bookmarks!(Some(&bookmark.title), None, 1);
+        assert_searched_bookmarks!(Some(&bookmark.title), Some(&folder2_path), 0);
+        info!("search bookmark in cwd");
+        move_bookmarks(&mut conn, folder2_id, &vec![bookmark.id])
+            .await
+            .unwrap();
+        assert_searched_bookmarks!(Some(&bookmark.title), Some(&folder2_path), 1);
     }
 }
