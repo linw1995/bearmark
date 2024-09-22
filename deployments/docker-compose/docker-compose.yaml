@@ -1,0 +1,32 @@
+name: bearmark
+
+services:
+  server:
+    container_name: bearmark_server
+    image: ghcr.io/linw1995/bearmark:latest
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - database
+    ports:
+      - 2284:8000
+    restart: always
+    environment:
+      RUST_BACKTRACE: full
+      RUST_LOG: ${RUST_LOG}
+      DATABASE_URL: postgres://${DB_USERNAME}:${DB_PASSWORD}@database:5432/${DB_DATABASE_NAME}
+      ROCKET_ADDRESS: 0.0.0.0
+      ROCKET_API_KEY: ${API_KEY}
+  database:
+    container_name: bearmark_postgres
+    image: postgres:12
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+volumes:
+  pgdata:
+    name: bearmark_pgdata
