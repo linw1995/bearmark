@@ -1,0 +1,22 @@
+[package]
+name = "bearmark-ql"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+peggen = "0.2.6"
+
+# allocation
+bumpalo.workspace = true
+
+# logging
+tracing.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+# setup for tests
+ctor.workspace = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }

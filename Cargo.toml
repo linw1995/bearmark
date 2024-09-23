@@ -4,6 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[workspace]
+members = [".", "bearmark-ql"]
+
+[workspace.dependencies]
+# allocation
+bumpalo = "3.16.0"
+# logging
+tracing = "0.1.40"
+tracing-appender = "0.2.3"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+# initialization
+ctor = "0.2.8"
 
 [dependencies]
 rocket = { version = "0.5.1", features = ["json"] }
@@ -12,15 +24,22 @@ rocket_db_pools = "0.2.0"
 # database
 diesel = { version = "2.2.0", features = ["postgres", "time"] }
 diesel-async = { version = "0.5.0", features = [
-	"async-connection-wrapper",
-	"postgres",
-	"deadpool",
+  "async-connection-wrapper",
+  "postgres",
+  "deadpool",
 ] }
 diesel_migrations = { version = "2.2.0", features = ["postgres"] }
 openssl-sys = { version = "0.9.102", features = [
-	"vendored",
+  "vendored",
 ] } # static linking required
 pq-sys = { version = "0.6.1", features = ["bundled"] } # static linking required
+
+#####################
+# search enhancement
+#####################
+bearmark-ql = { path = "bearmark-ql" }
+# allocation
+bumpalo.workspace = true
 
 ##################
 # other utilities
@@ -30,14 +49,12 @@ itertools = "0.13.0"
 serde = { version = "1.0.203", features = ["derive"] }
 time = { version = "0.3.36", features = ["local-offset", "macros", "serde"] }
 percent-encoding = "2.3.1"
-# search enhancement
-pratt-gen = "0.1.0"
 # read settings from the dotenv file
 dotenvy = "0.15.7"
 # logging
-tracing = "0.1.40"
-tracing-appender = "0.2.3"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
 # async runtime
 tokio = { version = "1.38.0", features = ["rt", "macros", "sync"] }
 futures = "0.3.30"
@@ -47,7 +64,7 @@ thiserror = "1.0.63"
 
 [dev-dependencies]
 # setup for tests
-ctor = "0.2.8"
+ctor.workspace = true
 
 [[bin]]
 name = "serve"
