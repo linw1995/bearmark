@@ -3,15 +3,15 @@ use diesel::pg::Pg;
 use diesel::prelude::*;
 use diesel::sql_types::Bool;
 use diesel_async::{AsyncPgConnection as Connection, RunQueryDsl};
-use pratt_gen::{parse, Arena, Source};
 use tracing::{debug, warn};
 
 use super::bookmark::Bookmark;
 use super::folder::Folder;
 use super::tag::Tag;
 use crate::db::schema;
-use crate::utils::search;
 use crate::utils::{BearQLError, CommonError};
+
+use bearmark_ql::{self as search, parse, Arena, Source};
 
 fn parse_query<'a>(
     raw: &'a str,

@@ -1,0 +1,21 @@
+[package]
+name = "bearmark-ql"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pratt-gen = "0.1.0"
+serde.workspace = true
+
+# logging
+tracing.workspace = true
+
+[dev-dependencies]
+# setup for tests
+ctor.workspace = true
+# logging
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
