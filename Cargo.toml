@@ -29,10 +29,6 @@ diesel-async = { version = "0.5.0", features = [
   "deadpool",
 ] }
 diesel_migrations = { version = "2.2.0", features = ["postgres"] }
-openssl-sys = { version = "0.9.102", features = [
-  "vendored",
-] } # static linking required
-pq-sys = { version = "0.6.1", features = ["bundled"] } # static linking required
 
 #####################
 # search enhancement
@@ -72,3 +68,7 @@ path = "src/bin/serve.rs"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
+
+[target.x86_64-unknown-linux-musl.dependencies]
+openssl-sys = { version = "0.9.102", features = ["vendored"] }
+pq-sys = { version = "0.6.1", features = ["bundled"] }

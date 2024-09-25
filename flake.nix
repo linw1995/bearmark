@@ -3,31 +3,36 @@
 
   inputs = {
     utils.url = "github:numtide/flake-utils";
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    stable.url = "github:NixOS/nixpkgs/nixos-24.05";
+    unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
   outputs = {
-    nixpkgs,
+    stable,
+    unstable,
     utils,
     ...
   }:
     utils.lib.eachDefaultSystem
     (
       system: let
-        pkgs = import nixpkgs {inherit system;};
-      in
-      {
+        pkgs = import stable {inherit system;};
+        lib = pkgs.lib;
+        unstable-pkgs = import unstable {inherit system;};
+      in {
         # Used by `nix develop`
         devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            pkg-config
+          buildInputs =
+            [
+              pkgs.pkg-config
 
-            postgresql.lib
-            openssl.dev
-            libiconv
-
-            darwin.apple_sdk.frameworks.SystemConfiguration
-          ];
+              pkgs.openssl.dev
+              pkgs.libiconv
+              unstable-pkgs.postgresql.dev
+            ]
+            ++ lib.optionals pkgs.stdenv.isDarwin [
+              pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+            ];
         };
       }
     );
