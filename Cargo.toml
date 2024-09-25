@@ -44,9 +44,9 @@ bumpalo.workspace = true
 ##################
 # other utilities
 ##################
+serde = { version = "1.0.203", features = ["derive"] }
 rand = "0.8.5"
 itertools = "0.13.0"
-serde = { version = "1.0.203", features = ["derive"] }
 time = { version = "0.3.36", features = ["local-offset", "macros", "serde"] }
 percent-encoding = "2.3.1"
 # read settings from the dotenv file

@@ -130,6 +130,7 @@ mod test {
             r#"title #rust"#,
             r#"/cs/pl/rust"#,
             r#"/cs/pl title"#,
+            r#"/cs/pl/rust title #rust"#,
             r#"/cs/pl title #rust"#,
             r#"/cs title #rust"#,
             r#"title | #rust"#,
