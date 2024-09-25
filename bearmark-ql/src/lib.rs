@@ -1,195 +1,135 @@
-use std::fmt::{Debug, Display};
+use bumpalo::boxed::Box as BBox;
+use bumpalo::collections::String as BString;
+use peggen::*;
 
-use pratt_gen::*;
-use serde::Serializer;
+pub use peggen::Parser;
 
-pub use pratt_gen::{parse, Arena, Source};
-
-#[derive(Debug, Clone, Copy, ParserImpl, Space)]
+#[derive(Debug, PartialEq, ParseImpl, Space, Num, EnumAstImpl)]
+#[with(&'a bumpalo::Bump)]
 pub enum Query<'a> {
-    #[parse("{0:2} | {1:1}", precedence = 2)]
-    Or(&'a Self, &'a Self),
-    #[parse("{0:4} {1:3}", precedence = 4)]
-    And(&'a Self, &'a Self),
-    #[parse("({0})")]
-    Parenthesized(&'a Self),
-    #[parse("{0}")]
-    Primitive(Primitive<'a>),
+    #[rule("{0:0} | {1:1}", group = 0)]
+    Or(BBox<'a, Query<'a>>, BBox<'a, Query<'a>>),
+    #[rule("{0:1} {1:2}", group = 1)]
+    And(BBox<'a, Query<'a>>, BBox<'a, Query<'a>>),
+    #[rule(r"( {0} )", group = 2)]
+    Parenthesized(BBox<'a, Query<'a>>),
+    #[rule(r#"#{0:`\w*`}"#, group = 2)]
+    Tag(BString<'a>),
+    #[rule(r#"{0:`\w+`}"#, group = 2)]
+    Keyword(BString<'a>),
+    #[rule(r#"{0:`(\.)?(/\w+)*/{0,2}`}"#, group = 3)]
+    Path(BString<'a>),
 }
 
-#[derive(Debug, Clone, Copy, ParserImpl, Space)]
-pub enum Primitive<'a> {
-    #[parse("{0}")]
-    Path(Path<'a>),
-    #[parse("#{0}")]
-    Tag(Tag<'a>),
-    #[parse("{0}")]
-    Keyword(Keyword<'a>),
-}
+#[cfg(test)]
+#[cfg(not(tarpaulin_include))]
+#[ctor::ctor]
+fn init() {
+    use std::io;
+    use tracing_subscriber::{prelude::*, EnvFilter};
 
-#[derive(Debug, Clone, Copy, ParserImpl, Space)]
-pub enum Path<'a> {
-    #[parse("./{0}")]
-    Relative(&'a RelativePath<'a>),
-    #[parse("/{0}")]
-    Absolute(&'a RelativePath<'a>),
-    #[parse("/")]
-    Root(),
-    #[parse("./")]
-    CWD(),
-}
+    let console_log = tracing_subscriber::fmt::layer()
+        .pretty()
+        .with_writer(io::stdout)
+        .boxed();
 
-#[derive(Debug, Clone, Copy, ParserImpl, Space)]
-pub enum RelativePath<'a> {
-    #[parse("{0}/{1}")]
-    Join(Keyword<'a>, &'a Self),
-    #[parse("{0}/")]
-    NameEndSlash(Keyword<'a>),
-    #[parse("{0}")]
-    Name(Keyword<'a>),
-    #[parse("/")] // for tailing "/", "//" ... syntax
-    ExtraSlash(),
-}
-
-#[derive(Debug, Clone, Copy, ParserImpl, Space)]
-pub enum Tag<'a> {
-    #[parse("{0}")]
-    Keyword(Keyword<'a>),
-    #[parse("")]
-    Null(),
-}
-
-#[derive(Clone, Copy, ParserImpl, Space)]
-pub enum Keyword<'a> {
-    #[parse("{0}")]
-    Quoted(&'a str),
-    #[parse("{0}")]
-    Unquoted(&'a Ident<'a>),
-}
-
-impl<'a> Debug for Keyword<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.serialize_str(match self {
-            Self::Quoted(s) => s,
-            Self::Unquoted(s) => s.0,
-        })
-    }
-}
-
-impl<'a> From<Keyword<'a>> for &'a str {
-    fn from(k: Keyword<'a>) -> &'a str {
-        match k {
-            Keyword::Quoted(s) => s,
-            Keyword::Unquoted(s) => s.0,
-        }
-    }
-}
-
-impl<'a> From<Tag<'a>> for &'a str {
-    fn from(t: Tag<'a>) -> &'a str {
-        match t {
-            Tag::Keyword(k) => k.into(),
-            Tag::Null() => "",
-        }
-    }
-}
-
-impl Display for Keyword<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Keyword::Quoted(s) => write!(f, "\"{}\"", s),
-            Keyword::Unquoted(s) => write!(f, "{}", s.0),
-        }
-    }
-}
-
-impl Display for Tag<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Tag::Keyword(k) => write!(f, "#{}", k),
-            Tag::Null() => Ok(()),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct QueryResult<'a> {
-    pub tags: Vec<&'a str>,
-    pub keywords: Vec<&'a str>,
-    pub paths: Vec<&'a str>,
-}
-
-fn _path_to_str_parts<'a>(p: Path<'a>, parts: &mut Vec<&'a str>) {
-    let mut cur = match p {
-        Path::Root() => {
-            parts.push("");
-            parts.push("");
-            return;
-        }
-        Path::Absolute(p) => {
-            parts.push("");
-            *p
-        }
-        Path::Relative(p) => {
-            parts.push(".");
-            *p
-        }
-        Path::CWD() => {
-            parts.push(".");
-            parts.push("");
-            return;
-        }
-    };
-    while match cur {
-        RelativePath::Join(item, that) => {
-            parts.push(item.into());
-            cur = *that;
-            true
-        }
-        RelativePath::Name(item) => {
-            parts.push(item.into());
-            false
-        }
-        RelativePath::NameEndSlash(item) => {
-            parts.push(item.into());
-            parts.push("");
-            false
-        }
-        RelativePath::ExtraSlash() => {
-            parts.push("");
-            parts.push("");
-            false
-        }
-    } {}
-}
-
-impl Display for Path<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut parts = vec![];
-        _path_to_str_parts(*self, &mut parts);
-        write!(f, "{}", parts.join("/"))
-    }
+    tracing_subscriber::registry()
+        .with(vec![console_log])
+        .with(EnvFilter::from_default_env())
+        .init();
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use tracing::{debug, info};
+    use Query::*;
 
-    fn parse_query<'a>(raw: &'a str, out_arena: &'a Arena, err_arena: &'a Arena) -> Query<'a> {
-        let source = Source::new(raw);
-        let rv = parse::<Query>(source, out_arena, err_arena);
-        debug!(?rv, ?source, "parsed");
+    use tracing::info;
+
+    #[test]
+    fn test_primitive_path() {
+        let bump = bumpalo::Bump::new();
+        for src in [
+            "/",          // root
+            "./",         // relative root
+            "/bar",       // decendent of /bar
+            "/bar/",      // decendent of /bar
+            "/bar/boo",   // decendent of /bar/boo
+            "/bar/boo/",  // decendent of /bar/boo
+            "./bar",      // decendent of ./bar
+            "./bar/",     // decendent of ./bar
+            "./bar/boo",  // decendent of ./bar/boo
+            "./bar/boo/", // decendent of ./bar/boo
+            "//",         // childern of root
+            ".//",        // children of relative root
+            "/boo//",     // children of /boot
+            "./boo//",    // children of ./boo
+        ] {
+            let rv = Parser::<Query>::parse_with(src, &bump);
+            info!(?rv, src, "parse result");
+            assert!(rv.is_ok());
+            assert_eq!(rv.unwrap(), Path(BString::from_str_in(src, &bump)));
+        }
+    }
+
+    #[test]
+    fn test_primitive_tag() {
+        let bump = bumpalo::Bump::new();
+        for src in [
+            "",        // empty tag
+            "foo",     // tag foo
+            "foo_bar", // tag foo_bar
+        ] {
+            let rv = Parser::<Query>::parse_with(&format!("#{}", src), &bump);
+            info!(?rv, src, "parse result");
+            assert!(rv.is_ok());
+            assert_eq!(rv.unwrap(), Tag(BString::from_str_in(src, &bump)));
+        }
+    }
+
+    #[test]
+    fn test_primitive_keyword() {
+        let bump = bumpalo::Bump::new();
+        for src in [
+            "foo",     // keyword foo
+            "foo_bar", // keyword foo_bar
+        ] {
+            let rv = Parser::<Query>::parse_with(src, &bump);
+            info!(?rv, src, "parse result");
+            assert!(rv.is_ok());
+            assert_eq!(rv.unwrap(), Keyword(BString::from_str_in(src, &bump)));
+        }
+    }
+
+    #[test]
+    fn test_query_and() {
+        let src = r#"#title | trust rust"#;
+        let bump = bumpalo::Bump::new();
+        let rv = Parser::<Query>::parse_with(src, &bump);
+        info!(?rv, src, "parse result");
         assert!(rv.is_ok());
-        rv.unwrap()
+        assert_eq!(
+            rv.unwrap(),
+            Or(
+                BBox::new_in(Tag(BString::from_str_in("title", &bump)), &bump),
+                BBox::new_in(
+                    And(
+                        BBox::new_in(Keyword(BString::from_str_in("trust", &bump)), &bump),
+                        BBox::new_in(Keyword(BString::from_str_in("rust", &bump)), &bump)
+                    ),
+                    &bump
+                )
+            )
+        );
     }
 
     #[test]
     fn test_parsing() {
-        let out_arena = Arena::new();
-        let err_arena = Arena::new();
-
+        let bump = bumpalo::Bump::new();
         for src in [
+            r#"title #rust"#,
+            r#"/cs/pl/rust"#,
+            r#"/cs/pl title"#,
             r#"/cs/pl/rust title #rust"#,
             r#"/cs/pl title #rust"#,
             r#"/cs title #rust"#,
@@ -199,8 +139,9 @@ mod test {
             r#"title ( #rust | #langs )"#,
             r#"/blog/"#,
         ] {
-            let rv = parse_query(src, &out_arena, &err_arena);
+            let rv = Parser::<Query>::parse_with(src, &bump);
             info!(?rv, ?src, "parsed");
+            assert!(rv.is_ok());
         }
     }
 }

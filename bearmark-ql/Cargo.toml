@@ -1,11 +1,13 @@
 [package]
 name = "bearmark-ql"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-pratt-gen = "0.1.0"
-serde.workspace = true
+peggen = "0.2.6"
+
+# allocation
+bumpalo.workspace = true
 
 # logging
 tracing.workspace = true

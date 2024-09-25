@@ -8,7 +8,8 @@ edition = "2021"
 members = [".", "bearmark-ql"]
 
 [workspace.dependencies]
-serde = { version = "1.0.203", features = ["derive"] }
+# allocation
+bumpalo = "3.16.0"
 # logging
 tracing = "0.1.40"
 tracing-appender = "0.2.3"
@@ -33,16 +34,21 @@ openssl-sys = { version = "0.9.102", features = [
 ] } # static linking required
 pq-sys = { version = "0.6.1", features = ["bundled"] } # static linking required
 
+#####################
+# search enhancement
+#####################
+bearmark-ql = { path = "bearmark-ql" }
+# allocation
+bumpalo.workspace = true
+
 ##################
 # other utilities
 ##################
-serde.workspace = true
+serde = { version = "1.0.203", features = ["derive"] }
 rand = "0.8.5"
 itertools = "0.13.0"
 time = { version = "0.3.36", features = ["local-offset", "macros", "serde"] }
 percent-encoding = "2.3.1"
-# search enhancement
-bearmark-ql = { path = "bearmark-ql" }
 # read settings from the dotenv file
 dotenvy = "0.15.7"
 # logging

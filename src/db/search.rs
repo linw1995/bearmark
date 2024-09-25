@@ -1,3 +1,4 @@
+use bumpalo;
 use diesel::expression::BoxableExpression;
 use diesel::pg::Pg;
 use diesel::prelude::*;
@@ -10,17 +11,15 @@ use super::folder::Folder;
 use super::tag::Tag;
 use crate::db::schema;
 use crate::utils::{BearQLError, CommonError};
-
-use bearmark_ql::{self as search, parse, Arena, Source};
+use bearmark_ql;
 
 fn parse_query<'a>(
-    raw: &'a str,
-    out_arena: &'a Arena,
-    err_arena: &'a Arena,
-) -> Result<search::Query<'a>, BearQLError> {
+    raw: &str,
+    bump: &'a bumpalo::Bump,
+) -> Result<bearmark_ql::Query<'a>, BearQLError> {
+    use bearmark_ql::{Parser, Query};
     debug!(?raw, "parsing query");
-    let source = Source::new(raw);
-    let rv = parse::<search::Query>(source, out_arena, err_arena).map_err(|e| {
+    let rv = Parser::<Query>::parse_with(raw, bump).map_err(|e| {
         warn!(?raw, ?e, "failed to parse query");
         BearQLError::SyntaxError {
             msg: "failed to parse query".to_string(),
@@ -77,100 +76,77 @@ fn find_bookmarks_in_path(
 }
 
 fn find_bookmarks(
-    query: search::Query<'_>,
+    query: &bearmark_ql::Query,
     cwd: &str,
     cwd_overwrited: &mut bool,
 ) -> Result<Box<dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>>, CommonError> {
     use super::schema::{bookmarks, bookmarks_tags, tags};
-    use search::Primitive::*;
-    use search::Query::*;
+    use bearmark_ql::Query::*;
 
     Ok(match query {
-        Or(a, b) => Box::new(find_bookmarks(*a, cwd, cwd_overwrited)?.or(find_bookmarks(
-            *b,
+        Or(a, b) => Box::new(find_bookmarks(a, cwd, cwd_overwrited)?.or(find_bookmarks(
+            b,
             cwd,
             cwd_overwrited,
         )?)),
-        And(a, b) => Box::new(find_bookmarks(*a, cwd, cwd_overwrited)?.and(find_bookmarks(
-            *b,
+        And(a, b) => Box::new(find_bookmarks(a, cwd, cwd_overwrited)?.and(find_bookmarks(
+            b,
             cwd,
             cwd_overwrited,
         )?)),
-        Parenthesized(a) => find_bookmarks(*a, cwd, cwd_overwrited)?,
-        Primitive(p) => {
-            match p {
-                Path(p) => {
-                    let target = p.to_string();
-                    let path = join_folder_path(cwd, &target);
-                    *cwd_overwrited = true;
-                    debug!(?path, ?cwd, ?target, "searching in path");
-                    if path == "/" {
-                        Box::new(bookmarks::dsl::id.eq(bookmarks::dsl::id)) // always true, no side effects
-                    } else if path == "//" {
-                        Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
-                    } else {
-                        find_bookmarks_in_path(&path)?
-                    }
-                }
-                Tag(t) => {
-                    let t = t.to_string();
-                    let t = t.trim_start_matches('#').trim().to_string();
-                    if t.is_empty() {
-                        return Err(CommonError::BearQL(BearQLError::EmptyTag));
-                    }
-                    let bookmarks = diesel::alias!(bookmarks as bm);
-                    Box::new(
-                        bookmarks::dsl::id.eq_any(
-                            bookmarks
-                                .inner_join(bookmarks_tags::table)
-                                .filter(bookmarks_tags::dsl::tag_id.eq_any(
-                                    tags::table.filter(tags::dsl::name.eq(t)).select(tags::id),
-                                ))
-                                .select(bookmarks.fields(bookmarks::id))
-                                .distinct(),
-                        ),
-                    )
-                }
-                Keyword(k) => {
-                    let k = k.to_string();
-                    let k = k.trim().to_string();
-                    if k.is_empty() {
-                        return Err(CommonError::BearQL(BearQLError::EmptyKeyword));
-                    }
-                    Box::new(
-                        bookmarks::dsl::title
-                            .ilike(format!("%{}%", k))
-                            .or(bookmarks::dsl::url.ilike(format!("%{}%", k))),
-                    )
-                }
+        Parenthesized(a) => find_bookmarks(a, cwd, cwd_overwrited)?,
+        Path(p) => {
+            let target = p.to_string();
+            let path = join_folder_path(cwd, &target);
+            *cwd_overwrited = true;
+            debug!(?path, ?cwd, ?target, "searching in path");
+            if path == "/" {
+                Box::new(bookmarks::dsl::id.eq(bookmarks::dsl::id)) // always true, no side effects
+            } else if path == "//" {
+                Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
+            } else {
+                find_bookmarks_in_path(&path)?
             }
+        }
+        Tag(t) => {
+            let t = t.to_string();
+            let t = t.trim_start_matches('#').trim().to_string();
+            if t.is_empty() {
+                return Err(CommonError::BearQL(BearQLError::EmptyTag));
+            }
+            let bookmarks = diesel::alias!(bookmarks as bm);
+            Box::new(
+                bookmarks::dsl::id.eq_any(
+                    bookmarks
+                        .inner_join(bookmarks_tags::table)
+                        .filter(
+                            bookmarks_tags::dsl::tag_id
+                                .eq_any(tags::table.filter(tags::dsl::name.eq(t)).select(tags::id)),
+                        )
+                        .select(bookmarks.fields(bookmarks::id))
+                        .distinct(),
+                ),
+            )
+        }
+        Keyword(k) => {
+            let k = k.to_string();
+            let k = k.trim().to_string();
+            if k.is_empty() {
+                return Err(CommonError::BearQL(BearQLError::EmptyKeyword));
+            }
+            Box::new(
+                bookmarks::dsl::title
+                    .ilike(format!("%{}%", k))
+                    .or(bookmarks::dsl::url.ilike(format!("%{}%", k))),
+            )
         }
     })
 }
 
+/// Search bookmarks by paths, keywords, and tags.
 pub async fn search_bookmarks(
     conn: &mut Connection,
     query: Option<&str>,
-    cwd: Option<&str>,
-    before: i32,
-    limit: i64,
-) -> Result<Vec<(Bookmark, Option<Folder>, Vec<Tag>)>, CommonError> {
-    if let Some(query) = query {
-        let out_arena = Arena::new();
-        let err_arena = Arena::new();
-
-        let rv = parse_query(query, &out_arena, &err_arena)?;
-
-        search_bookmarks_with_query(conn, Some(rv), cwd, before, limit).await
-    } else {
-        search_bookmarks_with_query(conn, None, cwd, before, limit).await
-    }
-}
-
-/// Search bookmarks by paths, keywords, and tags.
-async fn search_bookmarks_with_query(
-    conn: &mut Connection,
-    query: Option<search::Query<'_>>,
     cwd: Option<&str>,
     before: i32,
     limit: i64,
@@ -182,10 +158,13 @@ async fn search_bookmarks_with_query(
         .distinct_on(bookmarks::id)
         .filter(bookmarks::dsl::deleted_at.is_null())
         .into_boxed();
+
     let mut cwd_overwrited = false;
     if let Some(query) = query {
         let cwd = cwd.unwrap_or("/");
-        builder = builder.filter(find_bookmarks(query, cwd, &mut cwd_overwrited)?)
+        let bump = bumpalo::Bump::new();
+        let query = parse_query(query, &bump)?;
+        builder = builder.filter(find_bookmarks(&query, cwd, &mut cwd_overwrited)?)
     }
     if !cwd_overwrited {
         if let Some(cwd) = cwd {
@@ -199,21 +178,22 @@ async fn search_bookmarks_with_query(
             }
         }
     }
+
     if before > 0 {
         builder = builder.filter(bookmarks::dsl::id.lt(before));
     }
+
     let lst = builder
         .order_by(bookmarks::id.desc())
         .limit(limit)
         .load::<Bookmark>(conn)
         .await
         .expect("Error loading bookmarks");
-
-    if lst.is_empty() {
-        return Ok(vec![]);
-    }
-
-    Ok(get_bookmark_details(conn, lst).await)
+    Ok(if lst.is_empty() {
+        vec![]
+    } else {
+        get_bookmark_details(conn, lst).await
+    })
 }
 
 pub async fn get_bookmark_details(
@@ -317,31 +297,27 @@ pub(crate) mod test {
         Keyword(String),
     }
 
-    fn simplify_query(q: search::Query) -> Query {
+    fn simplify_query(q: &bearmark_ql::Query) -> Query {
         use Query::*;
         match q {
-            search::Query::Or(a, b) => {
-                Or(Box::new(simplify_query(*a)), Box::new(simplify_query(*b)))
+            bearmark_ql::Query::Or(a, b) => {
+                Or(Box::new(simplify_query(a)), Box::new(simplify_query(b)))
             }
-            search::Query::And(a, b) => {
-                And(Box::new(simplify_query(*a)), Box::new(simplify_query(*b)))
+            bearmark_ql::Query::And(a, b) => {
+                And(Box::new(simplify_query(a)), Box::new(simplify_query(b)))
             }
-            search::Query::Parenthesized(a) => Parenthesized(Box::new(simplify_query(*a))),
-            search::Query::Primitive(p) => match p {
-                search::Primitive::Path(p) => Path(p.to_string()),
-                search::Primitive::Tag(t) => Tag(t.to_string().trim_start_matches('#').to_string()),
-                search::Primitive::Keyword(k) => Keyword(k.to_string()),
-            },
+            bearmark_ql::Query::Parenthesized(a) => Parenthesized(Box::new(simplify_query(a))),
+            bearmark_ql::Query::Path(p) => Path(p.to_string()),
+            bearmark_ql::Query::Tag(t) => Tag(t.to_string().trim_start_matches('#').to_string()),
+            bearmark_ql::Query::Keyword(k) => Keyword(k.to_string()),
         }
     }
 
     #[test]
     fn test_parse_query() {
-        let out_arena = Arena::new();
-        let err_arena = Arena::new();
-
         use Query::*;
 
+        let bump = bumpalo::Bump::new();
         for (raw, expect) in &[
             ("rust", Keyword("rust".into())),
             ("#rust", Tag("rust".into())),
@@ -352,6 +328,13 @@ pub(crate) mod test {
             ("//", Path("//".into())),
             (".//", Path(".//".into())),
             ("/blog/", Path("/blog/".into())),
+            (
+                "title #rust",
+                And(
+                    Box::new(Keyword("title".into())),
+                    Box::new(Tag("rust".into())),
+                ),
+            ),
             (
                 "rust | langs go",
                 Or(
@@ -383,9 +366,9 @@ pub(crate) mod test {
                 ),
             ),
         ] {
-            let query = parse_query(raw, &out_arena, &err_arena).unwrap();
-            let query = simplify_query(query);
-
+            let query = parse_query(raw, &bump).unwrap();
+            let query = simplify_query(&query);
+            info!(?raw, ?query, ?expect, "testing parse query");
             assert_eq!(query, *expect);
         }
     }
