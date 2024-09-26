@@ -32,7 +32,7 @@ pub async fn run_migrations() {
     use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
     use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
-    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("../migrations");
     let conn = establish().await;
 
     let mut async_wrapper: AsyncConnectionWrapper<AsyncPgConnection> =
