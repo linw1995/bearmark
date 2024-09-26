@@ -1,0 +1,60 @@
+[package]
+name = "bearmark-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rocket = { version = "0.5.1", features = ["json"] }
+rocket_db_pools = "0.2.0"
+
+# database
+diesel = { version = "2.2.0", features = ["postgres", "time"] }
+diesel-async = { version = "0.5.0", features = [
+  "async-connection-wrapper",
+  "postgres",
+  "deadpool",
+] }
+diesel_migrations = { version = "2.2.0", features = ["postgres"] }
+
+#####################
+# search enhancement
+#####################
+bearmark-ql.workspace = true
+# allocation
+bumpalo.workspace = true
+
+##################
+# other utilities
+##################
+serde = { version = "1.0.203", features = ["derive"] }
+rand = "0.8.5"
+itertools = "0.13.0"
+time = { version = "0.3.36", features = ["local-offset", "macros", "serde"] }
+percent-encoding = "2.3.1"
+# read settings from the dotenv file
+dotenvy = "0.15.7"
+# logging
+tracing.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
+# async runtime
+tokio = { version = "1.38.0", features = ["rt", "macros", "sync"] }
+futures = "0.3.30"
+# error handling
+anyhow = "1.0.86"
+thiserror = "1.0.63"
+
+[dev-dependencies]
+# setup for tests
+ctor.workspace = true
+
+[[bin]]
+name = "serve"
+path = "src/bin/serve.rs"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
+
+[target.x86_64-unknown-linux-musl.dependencies]
+openssl-sys = { version = "0.9.102", features = ["vendored"] }
+pq-sys = { version = "0.6.1", features = ["bundled"] }
