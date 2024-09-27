@@ -53,16 +53,17 @@ open http://localhost:2284
 
 ## Developments
 
-Use nix to setup development environment.
+Use nix to setup development environment,
+or use `direnv` to load nix environment automatically.
 
 ```bash
+# setup database by docker compose
+# and generate .envrc file
+./scripts/cli.sh setup
+
+# activate manually
 nix develop
-```
-
-Or use `direnv` to load nix environment automatically.
-
-```bash
-echo "use flake" > .envrc
+source .envrc
 ```
 
 ### Helpful Scripts
