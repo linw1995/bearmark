@@ -71,7 +71,8 @@ jobs:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
 
-      - uses: andreygubarev/setup-direnv@v1
+      - name: "Setup env"
+        uses: JRMurr/direnv-nix-action@v4.1.0
 
       - name: Run lints
         run: |
