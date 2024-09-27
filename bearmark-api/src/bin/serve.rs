@@ -1,11 +1,11 @@
 #[macro_use]
 extern crate rocket;
 
-use bearmark_api::api::configs::Config;
+use bearmark_api::api::configs::{self, Config};
 use bearmark_api::api::fairings::db::Db;
 use bearmark_api::api::{bookmark, folder, tag};
 
-use rocket::figment::providers::{Env, Serialized};
+use rocket::fairing::AdHoc;
 use rocket::fs::FileServer;
 use rocket_db_pools::Database;
 
@@ -15,10 +15,7 @@ async fn rocket() -> _ {
     bearmark_api::utils::logging::setup_console_log();
     bearmark_api::db::connection::run_migrations().await;
 
-    let cfg_provider = rocket::figment::Figment::from(rocket::Config::default())
-        .merge(Env::prefixed("BM_").global())
-        .merge(Serialized::defaults(Config::default()));
-
+    let cfg_provider = configs::config_provider();
     let ui_path = cfg_provider
         .extract_inner::<Option<String>>("ui_path")
         .unwrap();
@@ -33,4 +30,5 @@ async fn rocket() -> _ {
         .mount("/api/bookmarks", bookmark::routes())
         .mount("/api/tags", tag::routes())
         .mount("/api/folders", folder::routes())
+        .attach(AdHoc::config::<Config>())
 }

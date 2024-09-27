@@ -1,15 +1,15 @@
 use diesel_async::AsyncPgConnection;
-use dotenvy::dotenv;
-use std::env;
+
+use crate::api::configs;
 
 pub async fn establish() -> AsyncPgConnection {
     use diesel_async::AsyncConnection;
-    dotenv().ok();
 
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let mut conn = AsyncPgConnection::establish(&database_url)
+    let url = configs::get_database_url();
+
+    let mut conn = AsyncPgConnection::establish(&url)
         .await
-        .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
+        .unwrap_or_else(|_| panic!("Error connecting database",));
 
     if cfg!(debug_assertions) {
         use diesel::connection::InstrumentationEvent;
