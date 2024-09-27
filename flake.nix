@@ -19,13 +19,18 @@
         pkgs = import stable {inherit system;};
         lib = pkgs.lib;
         unstable-pkgs = import unstable {inherit system;};
+        cross = import stable {
+          inherit system;
+          crossSystem = {config = "x86_64-unknown-linux-musl";};
+        };
       in {
         # Used by `nix develop`
         devShells.default = pkgs.mkShell {
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+          ];
           buildInputs =
             [
-              pkgs.pkg-config
-
               pkgs.openssl.dev
               pkgs.libiconv
               unstable-pkgs.postgresql.dev
@@ -34,6 +39,12 @@
               pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
             ];
         };
+        devShells.x86_64-unknown-linux-musl = cross.mkShell (with cross.pkgsMusl; {
+          nativeBuildInputs = [
+            pkg-config
+          ];
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER = "${stdenv.cc.targetPrefix}cc";
+        });
       }
     );
 }

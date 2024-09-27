@@ -50,3 +50,46 @@ open http://localhost:2284
   Save the currently viewed Safari webpage to Bearmark.
   Configure your Bearmark server API endpoint <http://localhost:2284/api>
   and API key in the Raycast extension.
+
+## Developments
+
+Use nix to setup development environment.
+
+```bash
+nix develop
+```
+
+Or use `direnv` to load nix environment automatically.
+
+```bash
+echo "use flake" > .envrc
+```
+
+### Helpful Scripts
+
+Also, you can use `./scripts/cli.sh` to invoke startups and testings.
+
+```bash
+./scripts/cli.sh install-deps
+
+./scripts/cli.sh setup # setup database by docker compose
+./scripts/cli.sh teardown # cleanup
+
+./scripts/cli.sh lint
+./scripts/cli.sh test
+./scripts/cli.sh coverage
+```
+
+### Cross Compiling
+
+You can use the following command to cross compile the binary.
+
+Or use pre-built docker image [ghcr.io/linw1995/bearmark](https://github.com/linw1995/bearmark/pkgs/container/bearmark)
+
+```bash
+nix develop .#x86_64-unknown-linux-musl
+
+cargo build --target x86_64-unknown-linux-musl --release \
+  --package bearmark-api --bin serve
+echo `find target -name serve -type f`
+```
