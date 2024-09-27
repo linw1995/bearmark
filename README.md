@@ -51,7 +51,7 @@ open http://localhost:2284
   Configure your Bearmark server API endpoint <http://localhost:2284/api>
   and API key in the Raycast extension.
 
-## Development
+## Developments
 
 Use nix to setup development environment.
 
@@ -72,8 +72,10 @@ Also, you can use `./scripts/cli.sh` to invoke startups and testings.
 ```bash
 ./scripts/cli.sh install-deps
 
-./scripts/cli.sh setup
+./scripts/cli.sh setup # setup database by docker compose
+./scripts/cli.sh teardown # cleanup
 
+./scripts/cli.sh lint
 ./scripts/cli.sh test
 ./scripts/cli.sh coverage
 ```
