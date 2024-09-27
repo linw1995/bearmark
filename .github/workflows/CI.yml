@@ -64,13 +64,14 @@ jobs:
         with:
           crate: diesel_cli
           features: postgres
-      - uses: andreygubarev/setup-direnv@v1
       - name: Setup
         run: |
           ./scripts/cli.sh setup
         env:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
+
+      - uses: andreygubarev/setup-direnv@v1
 
       - name: Run lints
         run: |
