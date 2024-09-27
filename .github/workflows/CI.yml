@@ -71,9 +71,6 @@ jobs:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
 
-      - name: "Setup env"
-        uses: JRMurr/direnv-nix-action@v4.1.0
-
       - name: Run lints
         run: |
           ./scripts/cli.sh lint
@@ -84,6 +81,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
+          source .envrc
           ./scripts/cli.sh coverage-xml
         env:
           CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
