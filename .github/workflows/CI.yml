@@ -7,16 +7,16 @@ on:
       - .github/workflows/CI.yml
       - .cargo/config.toml
       - Cargo.toml
-      - ./**/*.rs
-      - ./scripts/cli.sh
+      - bearmark-*/**/*.rs
+      - scripts/cli.sh
   pull_request:
     branches: ["main"]
     paths:
       - .github/workflows/CI.yml
       - .cargo/config.toml
       - Cargo.toml
-      - ./**/*.rs
-      - ./scripts/cli.sh
+      - bearmark-*/**/*.rs
+      - scripts/cli.sh
 
 env:
   CARGO_TERM_COLOR: always
@@ -81,6 +81,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
+          source .envrc
           ./scripts/cli.sh coverage-xml
         env:
           CARGO_BUILD_TARGET: x86_64-unknown-linux-musl

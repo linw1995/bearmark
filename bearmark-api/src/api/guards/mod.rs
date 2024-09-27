@@ -72,7 +72,10 @@ mod test {
 
     #[test]
     fn test_disable_auth() {
-        let client = test_client(Config { api_key: None });
+        let client = test_client(Config {
+            api_key: None,
+            ..Default::default()
+        });
         let response = client.get(uri!(required_auth)).dispatch();
         assert_eq!(response.status(), Status::Ok);
     }
@@ -82,6 +85,7 @@ mod test {
         let key = rand_str(32);
         let client = test_client(Config {
             api_key: Some(key.clone()),
+            ..Default::default()
         });
 
         let response = client.get(uri!(required_auth)).dispatch();

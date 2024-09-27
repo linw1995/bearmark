@@ -6,7 +6,6 @@ use diesel_async::{
     },
     AsyncConnection, AsyncPgConnection,
 };
-use dotenvy::dotenv;
 use rocket::figment::Figment;
 use rocket_db_pools::{Database, Error};
 
@@ -21,10 +20,10 @@ impl rocket_db_pools::Pool for DBPool {
 
     type Error = Error<InitError, GetError>;
 
-    async fn init(_figment: &Figment) -> Result<Self, Self::Error> {
-        dotenv().ok();
-
-        let url = std::env::var("DATABASE_URL").expect("env DATABASE_URL must be set");
+    async fn init(figment: &Figment) -> Result<Self, Self::Error> {
+        let url = figment
+            .extract_inner::<String>("url")
+            .expect("database_url must be set");
         let config = AsyncDieselConnectionManager::<Connection>::new(url);
         match Pool::builder(config).build() {
             Ok(pool) => Ok(Self(pool)),
@@ -57,5 +56,5 @@ impl rocket_db_pools::Pool for DBPool {
 }
 
 #[derive(Database)]
-#[database("deadpool_diesel_postgres")]
+#[database("main")]
 pub struct Db(DBPool);

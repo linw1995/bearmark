@@ -56,15 +56,17 @@ main() {
 			echo ">>> Setting up the project development environment"
 			docker compose up -d --wait
 
-			echo "DATABASE_URL=postgres://postgres:example@${POSTGRES_HOST-localhost}:${POSTGRES_PORT-5432}/${POSTGRES_DB-bearmark}" >.env
+			url=postgres://postgres:example@${POSTGRES_HOST-localhost}:${POSTGRES_PORT-5432}/${POSTGRES_DB-bearmark}
+			echo "use flake
+export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
 			echo ">>> Setting up database"
-			./scripts/bin/diesel migration run
+			DATABASE_URL=$url ./scripts/bin/diesel migration run
 		else
 			echo ">>> Skip setting up the project development environment"
-
-			echo "DATABASE_URL=postgres://postgres:example@${POSTGRES_HOST-db}:${POSTGRES_PORT-5432}/${POSTGRES_DB-bearmark}" >.env
+			url=postgres://postgres:example@${POSTGRES_HOST-db}:${POSTGRES_PORT-5432}/${POSTGRES_DB-bearmark}
+			echo "export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
 			echo ">>> Setting up database"
-			diesel migration run
+			DATABASE_URL=$url diesel migration run
 		fi
 		echo ">>> Done"
 		;;

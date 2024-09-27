@@ -201,7 +201,7 @@ pub fn routes() -> Vec<rocket::Route> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::api::configs::Config;
+    use crate::api::configs::{self, Config};
     use crate::db::bookmark::test::rand_bookmark;
     use crate::utils::rand::rand_str;
 
@@ -213,7 +213,7 @@ mod test {
     use tracing::info;
 
     fn test_app() -> rocket::Rocket<rocket::Build> {
-        rocket::build()
+        rocket::custom(configs::config_provider())
             .attach(Db::init())
             .mount("/", routes())
             .attach(AdHoc::config::<Config>())
