@@ -14,7 +14,8 @@ services:
     environment:
       RUST_BACKTRACE: full
       RUST_LOG: ${RUST_LOG}
-      DATABASE_URL: postgres://${DB_USERNAME}:${DB_PASSWORD}@database:5432/${DB_DATABASE_NAME}
+      DATABASE_URL:
+      BM_DATABASES: '{main={url="postgres://${DB_USERNAME}:${DB_PASSWORD}@database:5432/${DB_DATABASE_NAME}"}}'
       BM_API_KEY: ${API_KEY}
   database:
     container_name: bearmark_postgres
