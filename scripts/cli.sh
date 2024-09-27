@@ -64,8 +64,7 @@ export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
 		else
 			echo ">>> Skip setting up the project development environment"
 			url=postgres://postgres:example@${POSTGRES_HOST-db}:${POSTGRES_PORT-5432}/${POSTGRES_DB-bearmark}
-			echo "use flake
-export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
+			echo "export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
 			echo ">>> Setting up database"
 			DATABASE_URL=$url diesel migration run
 		fi
