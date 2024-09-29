@@ -32,8 +32,8 @@ cleanup_profraw_files() {
 
 cd "$(dirname "$0")"/../
 
-tarpaulin_args="--workspace --include-tests --skip-clean --out html -- --show-output --test-threads 1"
-tarpaulin_xml_args="--workspace --include-tests --skip-clean --out xml -- --show-output --test-threads 1"
+tarpaulin_args="--workspace --exclude bearmark-macro --include-tests --skip-clean --out html -- --show-output --test-threads 1"
+tarpaulin_xml_args="--workspace --exclude bearmark-macro --include-tests --skip-clean --out xml -- --show-output --test-threads 1"
 
 main() {
 	action=${1-}
