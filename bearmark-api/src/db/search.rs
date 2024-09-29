@@ -1,4 +1,3 @@
-use bumpalo;
 use diesel::expression::BoxableExpression;
 use diesel::pg::Pg;
 use diesel::prelude::*;
@@ -11,7 +10,6 @@ use super::folder::Folder;
 use super::tag::Tag;
 use crate::db::schema;
 use crate::utils::{BearQLError, CommonError};
-use bearmark_ql;
 
 fn parse_query<'a>(
     raw: &str,

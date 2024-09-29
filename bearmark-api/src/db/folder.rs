@@ -83,6 +83,7 @@ pub async fn create_folder(conn: &mut Connection, path: &str) -> Result<Folder, 
         })
 }
 
+#[allow(dead_code)]
 pub async fn delete_folder(conn: &mut Connection, id: i32) {
     diesel::delete(folders::table.filter(folders::dsl::id.eq(id)))
         .execute(conn)
