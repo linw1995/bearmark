@@ -1,5 +1,5 @@
 [workspace]
-members = ["bearmark-api", "bearmark-ql"]
+members = ["bearmark-api", "bearmark-macro", "bearmark-ql"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -14,3 +14,4 @@ ctor = "0.2.8"
 
 # members
 bearmark-ql = { path = "./bearmark-ql" }
+bearmark-macro = { path = "./bearmark-macro" }

@@ -10,18 +10,28 @@ use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
 use rocket_db_pools::Connection;
 use tracing::info;
+use utoipa::ToSchema;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, ToSchema, Debug)]
 #[serde(crate = "rocket::serde")]
-pub struct NewFolder {
+pub struct CreateFolder {
     pub path: String,
 }
 
+/// Create a new folder
+#[utoipa::path(
+    post,
+    path = "/",
+    request_body = CreateFolder,
+    responses(
+        (status = 200, description = "Folder created success", body = Folder)
+    )
+)]
 #[post("/", format = "application/json", data = "<payload>")]
 pub async fn create_folder(
     mut db: Connection<Db>,
     _required: guards::Auth,
-    payload: Json<NewFolder>,
+    payload: Json<CreateFolder>,
 ) -> Result<Json<Folder>, Error> {
     let path = payload.into_inner().path;
 
@@ -45,6 +55,17 @@ pub async fn create_folder(
     Ok(Json(folder::create_folder(&mut db, &path).await?))
 }
 
+/// List folders
+#[utoipa::path(
+    get,
+    path = "/",
+    params(
+        ("cwd" = inline(Option<&str>), Query, description = "The path of folder to search in"),
+    ),
+    responses(
+        (status = 200, description = "Folders searched success", body = Vec<Folder>)
+    )
+)]
 #[get("/?<cwd>")]
 pub async fn list_folders(
     mut db: Connection<Db>,
@@ -54,6 +75,18 @@ pub async fn list_folders(
     Json(folder::list_folders(&mut db, cwd.unwrap_or_default()).await)
 }
 
+/// Move a bookmark into a folder
+#[utoipa::path(
+    get,
+    path = "/move_in/{bookmark_id}/{id}",
+    params(
+        ("bookmark_id" = inline(i32), Query, description = "The id of target bookmark"),
+        ("id" = inline(i32), Query, description = "The id of target folder"),
+    ),
+    responses(
+        (status = 200, description = "Bookmark moved into folder success")
+    )
+)]
 #[put("/move_in/<bookmark_id>/<id>")]
 pub async fn move_bookmark(
     mut db: Connection<Db>,
@@ -80,6 +113,17 @@ pub async fn move_bookmark(
     Ok(folder::move_bookmarks(&mut db, id, &vec![bookmark_id]).await?)
 }
 
+/// Move a bookmark out of a folder
+#[utoipa::path(
+    get,
+    path = "/move_out/{bookmark_id}",
+    params(
+        ("bookmark_id" = inline(i32), Query, description = "The id of target bookmark"),
+    ),
+    responses(
+        (status = 200, description = "Bookmark moved out of folder success")
+    )
+)]
 #[put("/move_out/<bookmark_id>")]
 pub async fn move_out_bookmark(
     mut db: Connection<Db>,
@@ -103,6 +147,41 @@ pub fn routes() -> Vec<rocket::Route> {
         move_bookmark,
         move_out_bookmark
     ]
+}
+
+pub(crate) mod misc {
+    use super::*;
+
+    use utoipa::{OpenApi, Path};
+
+    pub struct ApiDoc;
+
+    impl OpenApi for ApiDoc {
+        fn openapi() -> utoipa::openapi::OpenApi {
+            use utoipa::openapi::{InfoBuilder, OpenApiBuilder};
+
+            OpenApiBuilder::new()
+                .info(
+                    InfoBuilder::new()
+                        .title("Folders API")
+                        .description(Some("Folders API"))
+                        .version("1.0")
+                        .build(),
+                )
+                .paths(bearmark_macro::utoipa_paths!(
+                    "/api/folders",
+                    create_folder,
+                    list_folders,
+                    move_bookmark,
+                    move_out_bookmark
+                ))
+                .components(Some(bearmark_macro::utoipa_components![
+                    CreateFolder,
+                    Folder
+                ]))
+                .build()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -145,7 +224,7 @@ pub(crate) mod test {
         let path = format!("/{}", rand_str(10));
         let res = client
             .post(uri!(create_folder))
-            .json(&NewFolder { path: path.clone() })
+            .json(&CreateFolder { path: path.clone() })
             .dispatch();
         assert_eq!(res.status(), Status::Ok);
         let folder: Folder = res.into_json().unwrap();
@@ -154,7 +233,7 @@ pub(crate) mod test {
         // duplicate folder
         let res = client
             .post(uri!(create_folder))
-            .json(&NewFolder { path: path.clone() })
+            .json(&CreateFolder { path: path.clone() })
             .dispatch();
         assert_eq!(res.status(), Status::BadRequest);
         info!("duplicate folder response: {:?}", res.into_string());
@@ -169,14 +248,14 @@ pub(crate) mod test {
         // need to create parent folder first
         let res = client
             .post(uri!(create_folder))
-            .json(&NewFolder { path: path.clone() })
+            .json(&CreateFolder { path: path.clone() })
             .dispatch();
         assert_eq!(res.status(), Status::BadRequest);
 
         // create parent folder, then child folder
         let res = client
             .post(uri!(create_folder))
-            .json(&NewFolder {
+            .json(&CreateFolder {
                 path: parent_path.clone(),
             })
             .dispatch();
@@ -184,7 +263,7 @@ pub(crate) mod test {
         assert_eq!(res.into_json::<Folder>().unwrap().path, parent_path);
         let res = client
             .post(uri!(create_folder))
-            .json(&NewFolder { path: path.clone() })
+            .json(&CreateFolder { path: path.clone() })
             .dispatch();
         assert_eq!(res.status(), Status::Ok);
         assert_eq!(res.into_json::<Folder>().unwrap().path, path);
@@ -200,7 +279,7 @@ pub(crate) mod test {
         // create parent folder, then child folder
         let res = client
             .post(uri!(create_folder))
-            .json(&NewFolder {
+            .json(&CreateFolder {
                 path: parent_path.clone(),
             })
             .dispatch();
@@ -208,7 +287,7 @@ pub(crate) mod test {
         assert_eq!(res.into_json::<Folder>().unwrap().path, parent_path);
         let res = client
             .post(uri!(create_folder))
-            .json(&NewFolder { path: path.clone() })
+            .json(&CreateFolder { path: path.clone() })
             .dispatch();
         assert_eq!(res.status(), Status::Ok);
         assert_eq!(res.into_json::<Folder>().unwrap().path, path);
