@@ -24,7 +24,12 @@ pub struct CreateFolder {
     path = "/",
     request_body = CreateFolder,
     responses(
-        (status = 200, description = "Folder created success", body = Folder)
+        (status = 200, description = "Folder created success", body = Folder),
+        (status = 400, description = "Folder already exists"),
+        (status = 404, description = "Parent folder does not exist")
+    ),
+    security(
+        ("api_key" = [])
     )
 )]
 #[post("/", format = "application/json", data = "<payload>")]
@@ -47,9 +52,7 @@ pub async fn create_folder(
 
     // check if any parent folder does not exist
     if self_and_ancestors.any(|f| f.is_none()) {
-        return Err(Error::BadRequest(
-            "Parent folder does not exist".to_string(),
-        ));
+        return Err(Error::NotFound("Parent folder does not exist".to_string()));
     }
 
     Ok(Json(folder::create_folder(&mut db, &path).await?))
@@ -64,6 +67,9 @@ pub async fn create_folder(
     ),
     responses(
         (status = 200, description = "Folders searched success", body = Vec<Folder>)
+    ),
+    security(
+        ("api_key" = [])
     )
 )]
 #[get("/?<cwd>")]
@@ -85,6 +91,9 @@ pub async fn list_folders(
     ),
     responses(
         (status = 200, description = "Bookmark moved into folder success")
+    ),
+    security(
+        ("api_key" = [])
     )
 )]
 #[put("/move_in/<bookmark_id>/<id>")]
@@ -122,6 +131,9 @@ pub async fn move_bookmark(
     ),
     responses(
         (status = 200, description = "Bookmark moved out of folder success")
+    ),
+    security(
+        ("api_key" = [])
     )
 )]
 #[put("/move_out/<bookmark_id>")]
@@ -159,9 +171,12 @@ pub(crate) mod misc {
 
     impl OpenApi for ApiDoc {
         fn openapi() -> utoipa::openapi::OpenApi {
-            use utoipa::openapi::{InfoBuilder, OpenApiBuilder};
+            use utoipa::openapi::{
+                security::{ApiKey, ApiKeyValue, SecurityScheme},
+                InfoBuilder, OpenApiBuilder,
+            };
 
-            OpenApiBuilder::new()
+            let mut api = OpenApiBuilder::new()
                 .info(
                     InfoBuilder::new()
                         .title("Folders API")
@@ -178,9 +193,17 @@ pub(crate) mod misc {
                 ))
                 .components(Some(bearmark_macro::utoipa_components![
                     CreateFolder,
-                    Folder
+                    Folder,
+                    Error
                 ]))
-                .build()
+                .build();
+
+            api.components.as_mut().unwrap().add_security_scheme(
+                "api_key",
+                SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("Authorization"))),
+            );
+
+            api
         }
     }
 }
