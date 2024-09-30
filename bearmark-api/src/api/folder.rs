@@ -274,7 +274,7 @@ pub(crate) mod test {
             .post(uri!(create_folder))
             .json(&CreateFolder { path: path.clone() })
             .dispatch();
-        assert_eq!(res.status(), Status::BadRequest);
+        assert_eq!(res.status(), Status::NotFound);
 
         // create parent folder, then child folder
         let res = client
