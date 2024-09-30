@@ -12,6 +12,7 @@ fn init() {
     crate::utils::logging::setup_console_log();
 }
 
+#[cfg(not(tarpaulin_include))]
 pub(crate) mod misc {
     use utoipa::OpenApi;
     use utoipa_swagger_ui::SwaggerUi;

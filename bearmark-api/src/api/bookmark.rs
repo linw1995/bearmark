@@ -248,6 +248,7 @@ pub fn routes() -> Vec<rocket::Route> {
     ]
 }
 
+#[cfg(not(tarpaulin_include))]
 pub(crate) mod misc {
     use super::*;
 
