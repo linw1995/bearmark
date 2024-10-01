@@ -193,8 +193,7 @@ pub(crate) mod misc {
                 ))
                 .components(Some(bearmark_macro::utoipa_components![
                     CreateFolder,
-                    Folder,
-                    Error
+                    Folder
                 ]))
                 .build();
 

@@ -274,9 +274,12 @@ pub(crate) mod misc {
 
     impl OpenApi for ApiDoc {
         fn openapi() -> utoipa::openapi::OpenApi {
-            use utoipa::openapi::{InfoBuilder, OpenApiBuilder};
+            use utoipa::openapi::{
+                security::{ApiKey, ApiKeyValue, SecurityScheme},
+                InfoBuilder, OpenApiBuilder,
+            };
 
-            OpenApiBuilder::new()
+            let mut api = OpenApiBuilder::new()
                 .info(
                     InfoBuilder::new()
                         .title("Bookmarks API")
@@ -296,7 +299,14 @@ pub(crate) mod misc {
                     ModifyBookmark,
                     Bookmark
                 ]))
-                .build()
+                .build();
+
+            api.components.as_mut().unwrap().add_security_scheme(
+                "api_key",
+                SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("Authorization"))),
+            );
+
+            api
         }
     }
 }
