@@ -1,6 +1,9 @@
+use serde::Serialize;
+use utoipa::ToSchema;
+
 use crate::utils::{BearQLError, CommonError, DatabaseError};
 
-#[derive(Responder, Debug)]
+#[derive(Responder, Debug, Serialize, ToSchema)]
 pub enum Error {
     #[response(status = 404)]
     NotFound(String),

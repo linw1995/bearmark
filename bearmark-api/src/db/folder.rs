@@ -1,18 +1,21 @@
 use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection as Connection, RunQueryDsl};
 use rocket::serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use super::schema::{bookmarks, folders};
 use crate::utils::DatabaseError;
 
-#[derive(Queryable, Selectable, Identifiable, Debug, Clone, Deserialize, Serialize)]
+#[derive(Queryable, Selectable, Identifiable, Debug, Clone, Deserialize, Serialize, ToSchema)]
 #[diesel(table_name = folders)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Folder {
     pub id: i32,
     pub path: String,
+    #[schema(format = DateTime, value_type=String)]
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: time::OffsetDateTime,
+    #[schema(format = DateTime, value_type=String)]
     #[serde(with = "time::serde::rfc3339")]
     pub updated_at: time::OffsetDateTime,
 }
@@ -80,6 +83,7 @@ pub async fn create_folder(conn: &mut Connection, path: &str) -> Result<Folder, 
         })
 }
 
+#[allow(dead_code)]
 pub async fn delete_folder(conn: &mut Connection, id: i32) {
     diesel::delete(folders::table.filter(folders::dsl::id.eq(id)))
         .execute(conn)

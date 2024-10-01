@@ -9,35 +9,51 @@ use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
 use rocket_db_pools::Connection;
 use tracing::debug;
+use utoipa::ToSchema;
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateBookmarkPayload {
-    title: String,
-    url: String,
-    folder_id: Option<i32>,
-    tags: Vec<String>,
+#[derive(Serialize, Deserialize, ToSchema, Debug)]
+pub struct CreateBookmark {
+    pub title: String,
+    pub url: String,
+    pub folder_id: Option<i32>,
+    pub tags: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, Debug)]
 pub struct Bookmark {
-    id: i32,
-    title: String,
-    url: String,
-    folder: Option<String>,
-    tags: Vec<String>,
+    pub id: i32,
+    pub title: String,
+    pub url: String,
+    pub folder: Option<String>,
+    pub tags: Vec<String>,
+    #[schema(format = DateTime, value_type=String)]
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: time::OffsetDateTime,
+    #[schema(format = DateTime, value_type=String, nullable)]
     #[serde(with = "time::serde::rfc3339::option")]
     pub deleted_at: Option<time::OffsetDateTime>,
+    #[schema(format = DateTime, value_type=String)]
     #[serde(with = "time::serde::rfc3339")]
     pub updated_at: time::OffsetDateTime,
 }
 
+/// Create a new bookmark
+#[utoipa::path(
+    post,
+    path = "/",
+    request_body = CreateBookmark,
+    responses(
+        (status = 200, description = "Bookmark created success", body = Bookmark)
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
 #[post("/", format = "application/json", data = "<payload>")]
 pub async fn create_bookmark(
     mut db: Connection<Db>,
     _required: guards::Auth,
-    payload: Json<CreateBookmarkPayload>,
+    payload: Json<CreateBookmark>,
 ) -> Result<Json<Bookmark>, Error> {
     let payload = payload.into_inner();
     let (new, tags) = (
@@ -76,6 +92,24 @@ pub async fn create_bookmark(
     }))
 }
 
+/// Search bookmarks
+#[utoipa::path(
+    get,
+    path = "/",
+    params(
+        ("q" = inline(Option<&str>), Query, description = "Search query language"),
+        ("cwd" = inline(Option<&str>), Query, description = "The path of folder to search in"),
+        ("before" = inline(Option<i32>), Query, description = "The bookmark id to search before"),
+        ("limit" = inline(Option<i64>), Query, description = "The limit of search results")
+    ),
+    responses(
+        (status = 200, description = "Bookmarks searched success", body = Vec<Bookmark>),
+        (status = 400, description = "Bad query request")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
 #[get("/?<q>&<cwd>&<before>&<limit>")]
 pub async fn search_bookmarks(
     mut db: Connection<Db>,
@@ -111,6 +145,21 @@ pub async fn search_bookmarks(
     ))
 }
 
+/// Delete a bookmark
+#[utoipa::path(
+    delete,
+    path = "/{id}",
+    params(
+        ("id" = inline(Option<i32>), Path, description = "The bookmark id to be deleted")
+    ),
+    responses(
+        (status = 200, description = "Bookmark deleted success"),
+        (status = 404, description = "Bookmark not found")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
 #[delete("/<id>")]
 pub async fn delete_bookmark(
     mut db: Connection<Db>,
@@ -125,13 +174,30 @@ pub async fn delete_bookmark(
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, ToSchema, Debug)]
 pub struct ModifyBookmark {
     pub title: Option<String>,
     pub url: Option<String>,
     pub tags: Option<Vec<String>>,
 }
 
+/// Update a bookmark
+#[utoipa::path(
+    patch,
+    path = "/{id}",
+    params(
+        ("id" = inline(Option<i32>), Path, description = "The bookmark id to be updated")
+    ),
+    request_body = ModifyBookmark,
+    responses(
+        (status = 200, description = "Bookmark updated success", body = Bookmark),
+        (status = 400, description = "No changes"),
+        (status = 404, description = "Bookmark not found")
+    ),
+    security(
+        ("api_key" = [])
+    )
+)]
 #[patch("/<id>", format = "application/json", data = "<payload>")]
 pub async fn update_bookmark(
     mut db: Connection<Db>,
@@ -198,6 +264,53 @@ pub fn routes() -> Vec<rocket::Route> {
     ]
 }
 
+#[cfg(not(tarpaulin_include))]
+pub(crate) mod misc {
+    use super::*;
+
+    use utoipa::{OpenApi, Path};
+
+    pub struct ApiDoc;
+
+    impl OpenApi for ApiDoc {
+        fn openapi() -> utoipa::openapi::OpenApi {
+            use utoipa::openapi::{
+                security::{ApiKey, ApiKeyValue, SecurityScheme},
+                InfoBuilder, OpenApiBuilder,
+            };
+
+            let mut api = OpenApiBuilder::new()
+                .info(
+                    InfoBuilder::new()
+                        .title("Bookmarks API")
+                        .description(Some("Bookmarks API"))
+                        .version("1.0")
+                        .build(),
+                )
+                .paths(bearmark_macro::utoipa_paths!(
+                    "/api/bookmarks",
+                    create_bookmark,
+                    search_bookmarks,
+                    delete_bookmark,
+                    update_bookmark
+                ))
+                .components(Some(bearmark_macro::utoipa_components![
+                    CreateBookmark,
+                    ModifyBookmark,
+                    Bookmark
+                ]))
+                .build();
+
+            api.components.as_mut().unwrap().add_security_scheme(
+                "api_key",
+                SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("Authorization"))),
+            );
+
+            api
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -232,7 +345,7 @@ mod test {
     #[test]
     fn create_bookmark() {
         let client = test_client();
-        let payload = CreateBookmarkPayload {
+        let payload = CreateBookmark {
             url: "https://www.rust-lang.org".to_string(),
             title: "Rust".to_string(),
             folder_id: None,
@@ -253,7 +366,7 @@ mod test {
     #[test]
     fn delete_bookmark() {
         let client = test_client();
-        let payload = CreateBookmarkPayload {
+        let payload = CreateBookmark {
             url: "https://www.rust-lang.org".to_string(),
             title: "Rust".to_string(),
             folder_id: None,
@@ -419,7 +532,7 @@ mod test {
     #[test]
     fn unsearchable_deleted_bookmark() {
         let payload = rand_bookmark();
-        let payload = CreateBookmarkPayload {
+        let payload = CreateBookmark {
             url: payload.url,
             title: payload.title,
             folder_id: None,
@@ -478,7 +591,7 @@ mod test {
     fn update_exist_bookmark() {
         let client = test_client();
         let m = rand_bookmark();
-        let payload = CreateBookmarkPayload {
+        let payload = CreateBookmark {
             url: m.url,
             title: m.title,
             folder_id: None,
@@ -531,7 +644,7 @@ mod test {
     fn update_bookmark_no_change() {
         let client = test_client();
         let m = rand_bookmark();
-        let payload = CreateBookmarkPayload {
+        let payload = CreateBookmark {
             url: m.url,
             title: m.title,
             folder_id: None,
@@ -560,7 +673,7 @@ mod test {
     fn update_bookmark_tags() {
         let client = test_client();
         let m = rand_bookmark();
-        let payload = CreateBookmarkPayload {
+        let payload = CreateBookmark {
             url: m.url,
             title: m.title,
             folder_id: None,
