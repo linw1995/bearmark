@@ -44,6 +44,9 @@ pub struct Bookmark {
     request_body = CreateBookmark,
     responses(
         (status = 200, description = "Bookmark created success", body = Bookmark)
+    ),
+    security(
+        ("api_key" = [])
     )
 )]
 #[post("/", format = "application/json", data = "<payload>")]
@@ -100,7 +103,11 @@ pub async fn create_bookmark(
         ("limit" = inline(Option<i64>), Query, description = "The limit of search results")
     ),
     responses(
-        (status = 200, description = "Bookmarks searched success", body = Vec<Bookmark>)
+        (status = 200, description = "Bookmarks searched success", body = Vec<Bookmark>),
+        (status = 400, description = "Bad query request")
+    ),
+    security(
+        ("api_key" = [])
     )
 )]
 #[get("/?<q>&<cwd>&<before>&<limit>")]
@@ -146,7 +153,11 @@ pub async fn search_bookmarks(
         ("id" = inline(Option<i32>), Path, description = "The bookmark id to be deleted")
     ),
     responses(
-        (status = 200, description = "Bookmark deleted success")
+        (status = 200, description = "Bookmark deleted success"),
+        (status = 404, description = "Bookmark not found")
+    ),
+    security(
+        ("api_key" = [])
     )
 )]
 #[delete("/<id>")]
@@ -179,7 +190,12 @@ pub struct ModifyBookmark {
     ),
     request_body = ModifyBookmark,
     responses(
-        (status = 200, description = "Bookmark updated success", body = Bookmark)
+        (status = 200, description = "Bookmark updated success", body = Bookmark),
+        (status = 400, description = "No changes"),
+        (status = 404, description = "Bookmark not found")
+    ),
+    security(
+        ("api_key" = [])
     )
 )]
 #[patch("/<id>", format = "application/json", data = "<payload>")]
