@@ -1,4 +1,0 @@
-[build]
-# copied from `cargo tarpaulin --print-rust-flags`
-rustflags = "-Cdebuginfo=2 -Cstrip=none --cfg=tarpaulin -Clink-dead-code -Cinstrument-coverage"
-incremental = false
