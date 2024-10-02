@@ -36,7 +36,7 @@ tarpaulin_args="--workspace --include-tests --skip-clean --out html -- --show-ou
 tarpaulin_xml_args="--workspace --include-tests --skip-clean --out xml -- --show-output --test-threads 1"
 
 export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
-export DYLD_LIBRARY_PATH="$(rustc --print sysroot)/lib:$DYLD_LIBRARY_PATH"
+export DYLD_LIBRARY_PATH="$(rustc --print sysroot)/lib:${DYLD_LIBRARY_PATH-}"
 
 main() {
 	action=${1-}
