@@ -32,8 +32,12 @@ cleanup_profraw_files() {
 
 cd "$(dirname "$0")"/../
 
-tarpaulin_args="--workspace --exclude bearmark-macro --include-tests --skip-clean --out html -- --show-output --test-threads 1"
-tarpaulin_xml_args="--workspace --exclude bearmark-macro --include-tests --skip-clean --out xml -- --show-output --test-threads 1"
+tarpaulin_args="--workspace --include-tests --skip-clean --out html --engine llvm -- --show-output --test-threads 1"
+tarpaulin_xml_args="--workspace --include-tests --skip-clean --out xml --engine llvm -- --show-output --test-threads 1"
+
+export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
+export DYLD_LIBRARY_PATH="$(rustc --print sysroot)/lib:${DYLD_LIBRARY_PATH-}" # MacOS
+export LD_LIBRARY_PATH="$(rustc --print sysroot)/lib:${LD_LIBRARY_PATH-}"     # Linux
 
 main() {
 	action=${1-}
