@@ -42,17 +42,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
       - name: Install dependencies
         run: |
           sudo apt install -yq \
             build-essential \
-            musl-dev \
-            musl-tools
+            libssl-dev \
+            pkg-config
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          target: x86_64-unknown-linux-musl
-
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.5
       - name: cargo-install cargo-tarpaulin
@@ -76,7 +72,6 @@ jobs:
         run: |
           ./scripts/cli.sh lint
         env:
-          CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
 
@@ -85,7 +80,6 @@ jobs:
           source .envrc
           ./scripts/cli.sh coverage-xml
         env:
-          CARGO_BUILD_TARGET: x86_64-unknown-linux-musl
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
           RUST_LOG: bearmark=debug,rocket=info
