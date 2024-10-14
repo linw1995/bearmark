@@ -6,7 +6,8 @@ on:
     paths:
       - .github/workflows/CI.yml
       - .cargo/config.toml
-      - Cargo.lock
+      - Cargo.toml
+      - bearmark-*/Cargo.toml
       - bearmark-*/**/*.rs
       - scripts/cli.sh
   pull_request:
@@ -15,6 +16,7 @@ on:
       - .github/workflows/CI.yml
       - .cargo/config.toml
       - Cargo.toml
+      - bearmark-*/Cargo.toml
       - bearmark-*/**/*.rs
       - scripts/cli.sh
 
