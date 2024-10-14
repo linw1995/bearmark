@@ -38,6 +38,9 @@
             ++ lib.optionals pkgs.stdenv.isDarwin [
               pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
             ];
+          packages = with pkgs; [
+            pre-commit
+          ];
         };
         devShells.x86_64-unknown-linux-musl = cross.mkShell (with cross.pkgsMusl; {
           nativeBuildInputs = [
