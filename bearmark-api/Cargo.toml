@@ -8,7 +8,7 @@ rocket = { version = "0.5.1", features = ["json"] }
 rocket_db_pools = "0.2.0"
 
 # database
-diesel = { version = "2.2.0", features = ["postgres", "time"] }
+diesel = { version = "2.2.4", features = ["postgres", "time"] }
 diesel-async = { version = "0.5.0", features = [
   "async-connection-wrapper",
   "postgres",
