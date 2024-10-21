@@ -44,7 +44,7 @@ anyhow = "1.0.89"
 thiserror = "1.0.64"
 # API Doc Gen
 utoipa = "4.2.3"
-utoipa-swagger-ui = { version = "7.1.0", features = ["rocket"] }
+utoipa-swagger-ui = { version = "8.0.1", features = ["rocket"] }
 utoipa-rapidoc = { version = "5.0.0", features = ["rocket"] }
 
 [dev-dependencies]
