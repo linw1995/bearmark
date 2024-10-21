@@ -55,5 +55,5 @@ ctor.workspace = true
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
 
 [target.x86_64-unknown-linux-musl.dependencies]
-openssl-sys = { version = "0.9.102", features = ["vendored"] }
+openssl-sys = { version = "0.9.104", features = ["vendored"] }
 pq-sys = { version = "0.6.1", features = ["bundled"] }
