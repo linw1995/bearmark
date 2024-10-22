@@ -34,16 +34,16 @@ pub fn utoipa_paths(input: TokenStream) -> TokenStream {
         tailing_paths.extend(quote! {
             .path(
                 format!("{}{}", #prefix, #ident::path()),
-                #ident::path_item(None),
+                PathItem::from_http_methods(#ident::methods(), #ident::operation()),
             )
         });
     }
 
     let output = quote! {
         {
-            use utoipa::openapi::PathsBuilder;
+            use utoipa::openapi::{Paths, path::PathItem};
 
-            let mut builder = PathsBuilder::new();
+            let mut builder = Paths::builder();
             builder = builder #tailing_paths;
 
             builder.build()
