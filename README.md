@@ -51,6 +51,11 @@ open http://localhost:2284
   Configure your Bearmark server API endpoint <http://localhost:2284/api>
   and API key in the Raycast extension.
 
+- Auto-generated OpenAPI documentation
+
+  Already integrated with Bearmark server.
+  Open the link <http://localhost:2284/swagger-ui/> in your browser.
+
 ## Developments
 
 Use nix to setup development environment,
