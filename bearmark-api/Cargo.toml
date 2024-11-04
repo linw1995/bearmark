@@ -27,7 +27,7 @@ bumpalo.workspace = true
 ##################
 # other utilities
 ##################
-serde = { version = "1.0.210", features = ["derive"] }
+serde = { version = "1.0.214", features = ["derive"] }
 rand = "0.8.5"
 itertools = "0.13.0"
 time = { version = "0.3.36", features = ["local-offset", "macros", "serde"] }
