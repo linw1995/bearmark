@@ -9,7 +9,7 @@ rocket_db_pools = "0.2.0"
 
 # database
 diesel = { version = "2.2.4", features = ["postgres", "time"] }
-diesel-async = { version = "0.5.0", features = [
+diesel-async = { version = "0.5.1", features = [
   "async-connection-wrapper",
   "postgres",
   "deadpool",
