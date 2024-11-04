@@ -8,7 +8,7 @@ proc-macro = true
 
 [dependencies]
 quote = "1.0.37"
-syn = { version = "2.0.85", features = [] }
+syn = { version = "2.0.87", features = [] }
 
 [dev-dependencies]
-syn = { version = "2.0.85", features = ["extra-traits"] }
+syn = { version = "2.0.87", features = ["extra-traits"] }
