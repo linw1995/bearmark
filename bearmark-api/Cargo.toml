@@ -37,7 +37,7 @@ tracing.workspace = true
 tracing-appender.workspace = true
 tracing-subscriber.workspace = true
 # async runtime
-tokio = { version = "1.41.0", features = ["rt", "macros", "sync"] }
+tokio = { version = "1.41.1", features = ["rt", "macros", "sync"] }
 futures = "0.3.31"
 # error handling
 anyhow = "1.0.92"
