@@ -10,7 +10,7 @@ tracing = "0.1.40"
 tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 # initialization
-ctor = "0.2.8"
+ctor = "0.2.9"
 
 # members
 bearmark-ql = { path = "./bearmark-ql" }
