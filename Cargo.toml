@@ -6,7 +6,7 @@ resolver = "2"
 # allocation
 bumpalo = "3.16.0"
 # logging
-tracing = "0.1.40"
+tracing = "0.1.41"
 tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 # initialization
