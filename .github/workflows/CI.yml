@@ -51,6 +51,9 @@ jobs:
             libssl-dev \
             pkg-config
       - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          # https://github.com/xd009642/tarpaulin/issues/1642
+          toolchain: 1.82.0
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.5
       - name: cargo-install cargo-tarpaulin
