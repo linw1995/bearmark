@@ -40,7 +40,7 @@ tracing-subscriber.workspace = true
 tokio = { version = "1.41.1", features = ["rt", "macros", "sync"] }
 futures = "0.3.31"
 # error handling
-anyhow = "1.0.93"
+anyhow = "1.0.94"
 thiserror = "2.0.6"
 # API Doc Gen
 utoipa = "5.2.0"
