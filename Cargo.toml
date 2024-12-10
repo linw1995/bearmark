@@ -8,7 +8,7 @@ bumpalo = "3.16.0"
 # logging
 tracing = "0.1.41"
 tracing-appender = "0.2.3"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 # initialization
 ctor = "0.2.9"
 
