@@ -67,6 +67,7 @@ jobs:
         with:
           crate: diesel_cli
           features: postgres
+          args: --no-default-features
       - name: Setup
         run: |
           ./scripts/cli.sh setup
