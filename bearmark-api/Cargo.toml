@@ -41,7 +41,7 @@ tokio = { version = "1.42.0", features = ["rt", "macros", "sync"] }
 futures = "0.3.31"
 # error handling
 anyhow = "1.0.95"
-thiserror = "2.0.8"
+thiserror = "2.0.9"
 # API Doc Gen
 utoipa = "5.3.0"
 utoipa-swagger-ui = { version = "8.1.0", features = ["rocket"] }
