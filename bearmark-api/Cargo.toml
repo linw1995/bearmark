@@ -43,7 +43,7 @@ futures = "0.3.31"
 anyhow = "1.0.95"
 thiserror = "2.0.9"
 # API Doc Gen
-utoipa = "5.3.0"
+utoipa = "5.3.1"
 utoipa-swagger-ui = { version = "8.1.0", features = ["rocket"] }
 utoipa-rapidoc = { version = "5.0.0", features = ["rocket"] }
 
