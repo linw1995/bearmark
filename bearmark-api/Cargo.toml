@@ -45,7 +45,7 @@ thiserror = "2.0.9"
 # API Doc Gen
 utoipa = "5.3.1"
 utoipa-swagger-ui = { version = "8.1.0", features = ["rocket"] }
-utoipa-rapidoc = { version = "5.0.0", features = ["rocket"] }
+utoipa-rapidoc = { version = "5.0.1", features = ["rocket"] }
 
 [dev-dependencies]
 # setup for tests
