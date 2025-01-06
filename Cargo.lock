@@ -2364,9 +2364,9 @@ dependencies = [
 
 [[package]]
 name = "utoipa-rapidoc"
-version = "5.0.0"
+version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f5e784e313457e79d65c378bdfc2f74275f0db91a72252be7d34360ec2afbe1"
+checksum = "ee43847f4aabac9cd618436e73392d40ebe43f9d4c8a3edabf1255f5f0b2f346"
 dependencies = [
  "rocket",
  "serde",
