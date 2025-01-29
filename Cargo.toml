@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.dependencies]
 # allocation
-bumpalo = "3.16.0"
+bumpalo = "3.17.0"
 # logging
 tracing = "0.1.41"
 tracing-appender = "0.2.3"
