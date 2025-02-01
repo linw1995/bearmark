@@ -66,11 +66,13 @@ fn find_bookmarks_in_path(
                 .or(folders::dsl::path.eq(p)),
         )
     };
-    Ok(Box::new(bookmarks::dsl::folder_id.eq_any(
-        folders::table.filter(expression).select(
-            folders::id.nullable(), // .nullable() is a dirty patch to make check pass, no side effects
-        ),
-    )))
+    let folder_ids = folders::table.filter(expression).select(
+        folders::id.nullable(), // .nullable() is a dirty patch to make check pass, no side effects
+    );
+    let condition = bookmarks::dsl::folder_id
+        .eq_any(folder_ids)
+        .assume_not_null(); // .assume_not_null() is a dirty patch to make check pass, no side effects
+    Ok(Box::new(condition))
 }
 
 fn find_bookmarks(
