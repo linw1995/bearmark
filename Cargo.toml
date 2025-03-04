@@ -2,6 +2,10 @@
 members = ["bearmark-api", "bearmark-macro", "bearmark-ql"]
 resolver = "2"
 
+[workspace.package]
+edition = "2024"
+version = "0.2.0"
+
 [workspace.dependencies]
 # allocation
 bumpalo = "3.17"
