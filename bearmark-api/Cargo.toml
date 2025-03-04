@@ -4,17 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rocket = { version = "0.5.1", features = ["json"] }
-rocket_db_pools = "0.2.0"
+rocket = { version = "0.5", features = ["json"] }
+rocket_db_pools = "0.2"
 
 # database
-diesel = { version = "2.2.7", features = ["postgres", "time"] }
-diesel-async = { version = "0.5.2", features = [
+diesel = { version = "2.2", features = ["postgres", "time"] }
+diesel-async = { version = "0.5", features = [
   "async-connection-wrapper",
   "postgres",
   "deadpool",
 ] }
-diesel_migrations = { version = "2.2.0", features = ["postgres"] }
+diesel_migrations = { version = "2.2", features = ["postgres"] }
 
 #####################
 # search enhancement
@@ -27,25 +27,25 @@ bumpalo.workspace = true
 ##################
 # other utilities
 ##################
-serde = { version = "1.0.218", features = ["derive"] }
-rand = "0.9.0"
-itertools = "0.14.0"
-time = { version = "0.3.37", features = ["local-offset", "macros", "serde"] }
-percent-encoding = "2.3.1"
+serde = { version = "1.0", features = ["derive"] }
+rand = "0.9"
+itertools = "0.14"
+time = { version = "0.3", features = ["local-offset", "macros", "serde"] }
+percent-encoding = "2.3"
 # logging
 tracing.workspace = true
 tracing-appender.workspace = true
 tracing-subscriber.workspace = true
 # async runtime
-tokio = { version = "1.43.0", features = ["rt", "macros", "sync"] }
-futures = "0.3.31"
+tokio = { version = "1.43", features = ["rt", "macros", "sync"] }
+futures = "0.3"
 # error handling
-anyhow = "1.0.96"
-thiserror = "2.0.11"
+anyhow = "1.0"
+thiserror = "2.0"
 # API Doc Gen
-utoipa = "5.3.1"
-utoipa-swagger-ui = { version = "9.0.0", features = ["rocket"] }
-utoipa-rapidoc = { version = "6.0.0", features = ["rocket"] }
+utoipa = "5.3"
+utoipa-swagger-ui = { version = "9.0", features = ["rocket"] }
+utoipa-rapidoc = { version = "6.0", features = ["rocket"] }
 
 [dev-dependencies]
 # setup for tests
@@ -55,5 +55,5 @@ ctor.workspace = true
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
 
 [target.x86_64-unknown-linux-musl.dependencies]
-openssl-sys = { version = "0.9.106", features = ["vendored"] }
-pq-sys = { version = "0.7.0", features = ["bundled"] }
+openssl-sys = { version = "0.9", features = ["vendored"] }
+pq-sys = { version = "0.7", features = ["bundled"] }

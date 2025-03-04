@@ -4,7 +4,7 @@ version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-peggen = "0.2.6"
+peggen = "0.2"
 
 # allocation
 bumpalo.workspace = true
