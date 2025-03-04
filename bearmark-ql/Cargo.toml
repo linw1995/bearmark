@@ -1,10 +1,10 @@
 [package]
 name = "bearmark-ql"
-version = "0.2.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
-peggen = "0.2.6"
+peggen = "0.2"
 
 # allocation
 bumpalo.workspace = true
