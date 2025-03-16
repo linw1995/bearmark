@@ -128,7 +128,7 @@ pub async fn delete_tags(conn: &mut Connection, ids: Vec<i32>) -> usize {
 }
 
 pub async fn update_tag(conn: &mut Connection, id: i32, modified: ModifyTag) -> Option<Tag> {
-    use diesel::{dsl::now, ExpressionMethods};
+    use diesel::{ExpressionMethods, dsl::now};
 
     diesel::update(tags::table.find(id))
         .set((&modified, tags::updated_at.eq(now)))

@@ -26,7 +26,7 @@ pub enum Query<'a> {
 #[ctor::ctor]
 fn init() {
     use std::io;
-    use tracing_subscriber::{prelude::*, EnvFilter};
+    use tracing_subscriber::{EnvFilter, prelude::*};
 
     let console_log = tracing_subscriber::fmt::layer()
         .pretty()

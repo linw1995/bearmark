@@ -1,6 +1,6 @@
 pub fn setup_console_log() {
     use std::io;
-    use tracing_subscriber::{prelude::*, EnvFilter};
+    use tracing_subscriber::{EnvFilter, prelude::*};
 
     let console_log = tracing_subscriber::fmt::layer()
         .pretty()
