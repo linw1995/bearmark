@@ -1,7 +1,7 @@
 use diesel::{
+    Expression,
     expression::AsExpression,
     sql_types::{Text, VarChar},
-    Expression,
 };
 
 diesel::infix_operator!(RegexMatch, " ~ ", backend: diesel::pg::Pg);

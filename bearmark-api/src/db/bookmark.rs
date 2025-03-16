@@ -73,7 +73,7 @@ pub async fn update_bookmark(
     id: i32,
     modified: ModifyBookmark,
 ) -> Option<Bookmark> {
-    use diesel::{dsl::now, ExpressionMethods};
+    use diesel::{ExpressionMethods, dsl::now};
     diesel::update(bookmarks::table.find(id))
         .set((&modified, bookmarks::updated_at.eq(now)))
         .returning(Bookmark::as_returning())
@@ -84,7 +84,7 @@ pub async fn update_bookmark(
 }
 
 pub async fn delete_bookmarks(conn: &mut Connection, ids: Vec<i32>) -> usize {
-    use diesel::{dsl::now, ExpressionMethods};
+    use diesel::{ExpressionMethods, dsl::now};
 
     use super::schema::bookmarks::{dsl::*, table};
 

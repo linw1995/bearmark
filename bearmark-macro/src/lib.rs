@@ -2,9 +2,9 @@ use proc_macro::TokenStream;
 
 use quote::{format_ident, quote};
 use syn::{
+    Ident, LitStr, Result, Token,
     parse::{Parse, ParseStream, Parser},
     punctuated::Punctuated,
-    Ident, LitStr, Result, Token,
 };
 
 #[derive(Debug)]

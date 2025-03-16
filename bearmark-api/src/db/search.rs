@@ -251,15 +251,15 @@ pub async fn get_bookmark_details(
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;
-    use crate::db::bookmark::test::{create_rand_bookmark, rand_bookmark};
     use crate::db::bookmark::NewBookmark;
+    use crate::db::bookmark::test::{create_rand_bookmark, rand_bookmark};
     use crate::db::bookmark::{create_bookmark, delete_bookmarks};
     use crate::db::connection;
     use crate::db::folder::{create_folder, move_bookmarks};
     use crate::db::schema::bookmarks;
     use crate::db::tag::update_bookmark_tags;
-    use crate::utils::rand::rand_str;
     use crate::utils::DatabaseError;
+    use crate::utils::rand::rand_str;
 
     use itertools::Itertools;
     use tracing::{debug, info};

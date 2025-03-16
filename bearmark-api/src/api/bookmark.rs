@@ -3,8 +3,8 @@ use super::fairings::db::Db;
 use super::guards;
 use crate::db::{self, bookmark, folder, tag};
 
-use diesel_async::scoped_futures::ScopedFutureExt;
 use diesel_async::AsyncConnection;
+use diesel_async::scoped_futures::ScopedFutureExt;
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
 use rocket_db_pools::Connection;
@@ -275,8 +275,8 @@ pub(crate) mod misc {
     impl OpenApi for ApiDoc {
         fn openapi() -> utoipa::openapi::OpenApi {
             use utoipa::openapi::{
-                security::{ApiKey, ApiKeyValue, SecurityScheme},
                 InfoBuilder, OpenApiBuilder,
+                security::{ApiKey, ApiKeyValue, SecurityScheme},
             };
 
             let mut api = OpenApiBuilder::new()

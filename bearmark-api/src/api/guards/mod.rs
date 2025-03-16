@@ -62,7 +62,7 @@ mod test {
     }
 
     fn test_client(config: Config) -> blocking::Client {
-        use rocket::figment::{providers::Serialized, Figment};
+        use rocket::figment::{Figment, providers::Serialized};
         let figment = Figment::from(rocket::Config::default()).merge(Serialized::defaults(config));
         let app = rocket::custom(figment)
             .mount("/", routes![required_auth])

@@ -1,10 +1,10 @@
 use diesel::connection::InstrumentationEvent;
 use diesel_async::{
-    pooled_connection::{
-        deadpool::{BuildError, Object, Pool, PoolError},
-        AsyncDieselConnectionManager,
-    },
     AsyncConnection, AsyncPgConnection,
+    pooled_connection::{
+        AsyncDieselConnectionManager,
+        deadpool::{BuildError, Object, Pool, PoolError},
+    },
 };
 use rocket::figment::Figment;
 use rocket_db_pools::{Database, Error};

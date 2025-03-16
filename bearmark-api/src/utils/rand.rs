@@ -1,6 +1,6 @@
 pub fn rand_str(length: usize) -> String {
-    use rand::distr::Alphanumeric;
     use rand::Rng;
+    use rand::distr::Alphanumeric;
 
     rand::rng()
         .sample_iter(&Alphanumeric)

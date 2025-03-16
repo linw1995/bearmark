@@ -172,8 +172,8 @@ pub(crate) mod misc {
     impl OpenApi for ApiDoc {
         fn openapi() -> utoipa::openapi::OpenApi {
             use utoipa::openapi::{
-                security::{ApiKey, ApiKeyValue, SecurityScheme},
                 InfoBuilder, OpenApiBuilder,
+                security::{ApiKey, ApiKeyValue, SecurityScheme},
             };
 
             let mut api = OpenApiBuilder::new()
