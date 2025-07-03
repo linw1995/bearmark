@@ -49,7 +49,7 @@ impl Folder {
         let mut ancestors = Vec::new();
         let mut path = path.trim_matches('/');
         while !path.is_empty() {
-            ancestors.push(Self::get_by_path(conn, &format!("/{}", path)).await);
+            ancestors.push(Self::get_by_path(conn, &format!("/{path}")).await);
             let mut split = path.rsplitn(2, '/');
             // result is in reverse order, so nth(1) is the parent, nth(0) is the current
             // and if nth(1) is None, then it's the root folder
@@ -79,7 +79,7 @@ pub async fn create_folder(conn: &mut Connection, path: &str) -> Result<Folder, 
             ) => DatabaseError::DuplicationError {
                 table: "folders".to_string(),
             },
-            _ => panic!("Unexpected error: {:?}", e),
+            _ => panic!("Unexpected error: {e:?}"),
         })
 }
 
@@ -106,7 +106,7 @@ pub async fn move_bookmarks(
                 diesel::result::DatabaseErrorKind::ForeignKeyViolation,
                 _,
             ) => DatabaseError::ViolationError(),
-            _ => panic!("Unexpected error: {:?}", e),
+            _ => panic!("Unexpected error: {e:?}"),
         })?;
 
     Ok(())
