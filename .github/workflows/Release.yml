@@ -54,7 +54,7 @@ jobs:
           target: x86_64-unknown-linux-musl
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.5
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Build release
         continue-on-error: true

@@ -1,7 +1,7 @@
 {
   inputs = {
     utils.url = "github:numtide/flake-utils";
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
@@ -22,7 +22,6 @@
         ];
         nativeBuildInputs = with pkgs; [
           pkg-config
-          gcc # proc macro 等编译过程，需要原架构 toolchians
         ];
         buildInputs =
           (with pkgs; [

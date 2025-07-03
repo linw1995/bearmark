@@ -101,7 +101,7 @@ pub async fn search_tags(
     let mut query = tags::table.select(Tag::as_select()).into_boxed();
 
     for keyword in keywords {
-        query = query.filter(tags::dsl::name.ilike(format!("%{}%", keyword)));
+        query = query.filter(tags::dsl::name.ilike(format!("%{keyword}%")));
     }
 
     if before > 0 {

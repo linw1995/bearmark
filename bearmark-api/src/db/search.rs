@@ -22,7 +22,7 @@ fn parse_query<'a>(
         BearQLError::SyntaxError {
             msg: "failed to parse query".to_string(),
             ql: raw.to_string(),
-            err_msg: format!("{:?}", e),
+            err_msg: format!("{e:?}"),
         }
     })?;
     debug!(?rv, "parsed query");
@@ -62,7 +62,7 @@ fn find_bookmarks_in_path(
         // search bookmarks in the folder and its descendants
         Box::new(
             folders::dsl::path
-                .like(format!("{}/%", p))
+                .like(format!("{p}/%"))
                 .or(folders::dsl::path.eq(p)),
         )
     };
@@ -136,8 +136,8 @@ fn find_bookmarks(
             }
             Box::new(
                 bookmarks::dsl::title
-                    .ilike(format!("%{}%", k))
-                    .or(bookmarks::dsl::url.ilike(format!("%{}%", k))),
+                    .ilike(format!("%{k}%"))
+                    .or(bookmarks::dsl::url.ilike(format!("%{k}%"))),
             )
         }
     })
@@ -585,7 +585,7 @@ pub(crate) mod test {
         let folder1_path = format!("/{}", rand_str(10));
         let folder2_path = format!("/{}", rand_str(10));
         let folder3_name = rand_str(10);
-        let folder3_path = format!("{}/{}", folder1_path, folder3_name);
+        let folder3_path = format!("{folder1_path}/{folder3_name}");
 
         setup_folders_and_bookmarks(
             conn,
@@ -624,15 +624,15 @@ pub(crate) mod test {
         info!("search bookmarks in folder2");
         assert_searched_bookmarks!(Some(&folder2_path), None, 1);
 
-        let query = format!("{} | {}", folder1_path, folder2_path);
+        let query = format!("{folder1_path} | {folder2_path}",);
         info!(?query, "search bookmarks in folder1 and folder2");
         assert_searched_bookmarks!(Some(&query), None, 12);
 
-        let query = format!("{}//", folder1_path);
+        let query = format!("{folder1_path}//");
         info!(?query, "search bookmarks in folder1 only");
         assert_searched_bookmarks!(Some(&query), None, 10);
 
-        let query = format!("{}// | {}", folder1_path, folder2_path);
+        let query = format!("{folder1_path}// | {folder2_path}");
         info!(?query, "search bookmarks in folder1 only and folder2");
         assert_searched_bookmarks!(Some(&query), None, 11);
     }
@@ -647,7 +647,7 @@ pub(crate) mod test {
             ..
         } = setup_folders_and_bookmarks_default(&mut conn).await;
 
-        let query = format!("{} | {}", folder1_path, folder2_path);
+        let query = format!("{folder1_path} | {folder2_path}");
         let rv = search_bookmarks(&mut conn, Some(&query), None, 0, 5).await;
         info!(?query, ?rv, "searched bookmarks");
         let rv = rv.unwrap();
@@ -666,7 +666,7 @@ pub(crate) mod test {
         let SetupFoldersAndBookmarksDefaultReturn { folder1_path, .. } =
             setup_folders_and_bookmarks_default(&mut conn).await;
 
-        let query = format!("{}/", folder1_path);
+        let query = format!("{folder1_path}/");
         info!(
             ?query,
             "search bookmarks in folder1 and its descendants with single tailing slash"
@@ -727,15 +727,15 @@ pub(crate) mod test {
         assert_searched_bookmarks!(None, Some(&folder1_path), 11); // 10 + 1
         assert_searched_bookmarks!(None, Some(&folder2_path), 1);
 
-        let query = format!("./{}", folder3_name);
+        let query = format!("./{folder3_name}");
         info!(?query, "search bookmarks with cwd and relative path");
         assert_searched_bookmarks!(Some(&query), Some(&folder1_path), 1);
 
-        let query = format!("./{} | ./", folder3_name);
+        let query = format!("./{folder3_name} | ./");
         info!(?query, "search bookmarks with cwd and relative path");
         assert_searched_bookmarks!(Some(&query), Some(&folder1_path), 11); // 1 + 10
 
-        let query = format!("./{} | .//", folder3_name);
+        let query = format!("./{folder3_name} | .//");
         info!(?query, "search bookmarks with cwd and relative path");
         assert_searched_bookmarks!(Some(&query), Some(&folder1_path), 11); // 1 + 10
 
