@@ -1481,20 +1481,19 @@ dependencies = [
 
 [[package]]
 name = "peggen"
-version = "0.2.6"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83f2794212f94370e0d1efff6ee3f65ae446ef7aacc5b99eefdcd0b1f632deab"
+checksum = "5de650649fd724ed764e35cbfc5cf42df0426e5122c9b17e17026d4026f1c4d4"
 dependencies = [
  "peggen-core",
- "peggen-impl",
  "peggen-macs",
 ]
 
 [[package]]
 name = "peggen-core"
-version = "0.2.6"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a800104190e4af2860b9ccfa44f22970499285364266353a80fb0551831a9b76"
+checksum = "6e7a036168f935534d866dd97813f3342303861c1f289e9883a78a86ed36e5b3"
 dependencies = [
  "bumpalo",
  "bytemuck",
@@ -1507,21 +1506,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "peggen-impl"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "403d7833b88db6aa7a6217f622987642a380bec492d252617b337d871858f219"
-dependencies = [
- "bumpalo",
- "peggen-core",
- "peggen-macs",
-]
-
-[[package]]
 name = "peggen-macs"
-version = "0.2.6"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03ad5e8a679d4e5904e1a685e25aa0340a6dd684b55b6778058e0a1fc15c440d"
+checksum = "8f1a756b6bc5a14541ce68e29245173819c6d6ebbd15c922bd993a038310415e"
 dependencies = [
  "once_cell",
  "proc-macro2",
