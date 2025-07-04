@@ -4,7 +4,7 @@ use peggen::*;
 
 pub use peggen::Parser;
 
-#[derive(Debug, PartialEq, ParseImpl, Space, Num, EnumAstImpl)]
+#[derive(Debug, PartialEq, ParseImpl, SkipSpace, Num, EnumAstImpl)]
 #[with(&'a bumpalo::Bump)]
 pub enum Query<'a> {
     #[rule("{0:0} | {1:1}", group = 0)]
