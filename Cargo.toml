@@ -1,5 +1,5 @@
 [workspace]
-members = ["bearmark-api", "bearmark-macro", "bearmark-ql"]
+members = ["bearmark-api", "bearmark-macro", "bearmark-ql", "bearmark-web"]
 resolver = "2"
 
 [workspace.package]

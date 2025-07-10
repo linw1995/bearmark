@@ -1,0 +1,7 @@
+[package]
+name = "bearmark-web"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+leptos = { version = "0.8.2", features = ["csr"] }

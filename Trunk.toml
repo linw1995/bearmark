@@ -1,0 +1,11 @@
+[build]
+target = "bearmark-web/index.html"
+html_output = "index.html"
+minify = "never"
+
+[watch]
+watch = ["bearmark-web"]
+
+[serve]
+port = 1420
+open = false
