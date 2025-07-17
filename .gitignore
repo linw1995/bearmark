@@ -31,3 +31,4 @@ scripts/.crates.toml
 scripts/.crates2.json
 
 .cargo
+.claude/*.local.json
