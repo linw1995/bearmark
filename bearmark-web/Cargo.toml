@@ -5,3 +5,6 @@ version.workspace = true
 
 [dependencies]
 leptos = { version = "0.8.2", features = ["csr"] }
+bearmark-types.workspace = true
+serde.workspace = true
+time.workspace = true

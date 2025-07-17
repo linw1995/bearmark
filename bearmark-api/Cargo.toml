@@ -21,6 +21,7 @@ diesel_migrations = { version = "2.2", features = ["postgres"] }
 #####################
 bearmark-ql.workspace = true
 bearmark-macro.workspace = true
+bearmark-types = { workspace = true, features = ["diesel", "utoipa"] }
 # allocation
 bumpalo.workspace = true
 

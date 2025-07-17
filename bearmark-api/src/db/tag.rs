@@ -3,7 +3,7 @@ use diesel_async::{AsyncPgConnection as Connection, RunQueryDsl};
 use rocket::serde::{Deserialize, Serialize};
 
 use super::bookmark::Bookmark;
-use super::schema::{bookmarks_tags, tags};
+use bearmark_types::schema::{bookmarks_tags, tags};
 
 #[derive(Queryable, Selectable, Identifiable, Debug, Deserialize, Serialize)]
 #[diesel(table_name = tags)]

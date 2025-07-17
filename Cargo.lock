@@ -192,6 +192,7 @@ dependencies = [
  "anyhow",
  "bearmark-macro",
  "bearmark-ql",
+ "bearmark-types",
  "bumpalo",
  "ctor",
  "diesel",
@@ -239,10 +240,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "bearmark-types"
+version = "0.2.0"
+dependencies = [
+ "diesel",
+ "diesel-async",
+ "serde",
+ "thiserror 2.0.12",
+ "time",
+ "utoipa",
+]
+
+[[package]]
 name = "bearmark-web"
 version = "0.2.0"
 dependencies = [
+ "bearmark-types",
  "leptos",
+ "serde",
+ "time",
 ]
 
 [[package]]
@@ -3116,6 +3132,7 @@ checksum = "8a7619e19bc266e0f9c5e6686659d394bc57973859340060a69221e57dbc0c40"
 dependencies = [
  "deranged",
  "itoa",
+ "js-sys",
  "libc",
  "num-conv",
  "num_threads",

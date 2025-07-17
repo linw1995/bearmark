@@ -1,5 +1,5 @@
 [workspace]
-members = ["bearmark-api", "bearmark-macro", "bearmark-ql", "bearmark-web"]
+members = ["bearmark-api", "bearmark-macro", "bearmark-ql", "bearmark-web", "bearmark-types"]
 resolver = "2"
 
 [workspace.package]
@@ -15,7 +15,12 @@ tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # initialization
 ctor = "0.4"
+# serialization
+serde = { version = "1.0", features = ["derive"] }
+time = { version = "0.3", features = ["serde", "wasm-bindgen"] }
 
 # members
 bearmark-ql = { path = "./bearmark-ql" }
 bearmark-macro = { path = "./bearmark-macro" }
+bearmark-api = { path = "./bearmark-api" }
+bearmark-types = { path = "./bearmark-types" }

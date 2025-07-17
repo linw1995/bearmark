@@ -3,8 +3,8 @@ use diesel_async::{AsyncPgConnection as Connection, RunQueryDsl};
 use rocket::serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::schema::{bookmarks, folders};
 use crate::utils::DatabaseError;
+use bearmark_types::schema::{bookmarks, folders};
 
 #[derive(Queryable, Selectable, Identifiable, Debug, Clone, Deserialize, Serialize, ToSchema)]
 #[diesel(table_name = folders)]

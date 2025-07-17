@@ -1,6 +1,3 @@
-// ORM Schema
-pub mod schema;
-
 // ORM Models
 pub mod bookmark;
 pub mod folder;

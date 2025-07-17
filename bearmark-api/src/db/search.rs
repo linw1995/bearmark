@@ -8,8 +8,8 @@ use tracing::{debug, warn};
 use super::bookmark::Bookmark;
 use super::folder::Folder;
 use super::tag::Tag;
-use crate::db::schema;
 use crate::utils::{BearQLError, CommonError};
+use bearmark_types::schema;
 
 fn parse_query<'a>(
     raw: &str,
@@ -46,7 +46,7 @@ fn join_folder_path(cwd: &str, p: &str) -> String {
 fn find_bookmarks_in_path(
     p: &str,
 ) -> Result<Box<dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>>, CommonError> {
-    use super::schema::{bookmarks, folders};
+    use bearmark_types::schema::{bookmarks, folders};
 
     let without_descendants = p.ends_with("//");
     let p = p.trim_end_matches('/').to_string(); // remove trailing slashes
@@ -80,8 +80,8 @@ fn find_bookmarks(
     cwd: &str,
     cwd_overwrited: &mut bool,
 ) -> Result<Box<dyn BoxableExpression<schema::bookmarks::table, Pg, SqlType = Bool>>, CommonError> {
-    use super::schema::{bookmarks, bookmarks_tags, tags};
     use bearmark_ql::Query::*;
+    use bearmark_types::schema::{bookmarks, bookmarks_tags, tags};
 
     Ok(match query {
         Or(a, b) => Box::new(find_bookmarks(a, cwd, cwd_overwrited)?.or(find_bookmarks(
@@ -151,7 +151,7 @@ pub async fn search_bookmarks(
     before: i32,
     limit: i64,
 ) -> Result<Vec<(Bookmark, Option<Folder>, Vec<Tag>)>, CommonError> {
-    use super::schema::bookmarks;
+    use bearmark_types::schema::bookmarks;
 
     let mut builder = bookmarks::table
         .select(Bookmark::as_select())
@@ -202,8 +202,8 @@ pub async fn get_bookmark_details(
 ) -> Vec<(Bookmark, Option<Folder>, Vec<Tag>)> {
     use std::collections::HashMap;
 
-    use super::schema::{bookmarks_tags, folders, tags};
     use super::tag::BookmarkTag;
+    use bearmark_types::schema::{bookmarks_tags, folders, tags};
 
     let folder_ids = bookmarks
         .iter()
@@ -256,10 +256,10 @@ pub(crate) mod test {
     use crate::db::bookmark::{create_bookmark, delete_bookmarks};
     use crate::db::connection;
     use crate::db::folder::{create_folder, move_bookmarks};
-    use crate::db::schema::bookmarks;
     use crate::db::tag::update_bookmark_tags;
     use crate::utils::DatabaseError;
     use crate::utils::rand::rand_str;
+    use bearmark_types::schema::bookmarks;
 
     use itertools::Itertools;
     use tracing::{debug, info};

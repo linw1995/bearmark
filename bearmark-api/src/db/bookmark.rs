@@ -2,7 +2,7 @@ use diesel::prelude::*;
 use diesel_async::{AsyncPgConnection as Connection, RunQueryDsl};
 use rocket::serde::{Deserialize, Serialize};
 
-use super::schema::bookmarks;
+use bearmark_types::schema::bookmarks;
 
 #[derive(
     Queryable,
@@ -86,7 +86,7 @@ pub async fn update_bookmark(
 pub async fn delete_bookmarks(conn: &mut Connection, ids: Vec<i32>) -> usize {
     use diesel::{ExpressionMethods, dsl::now};
 
-    use super::schema::bookmarks::{dsl::*, table};
+    use bearmark_types::schema::bookmarks::{dsl::*, table};
 
     diesel::update(table)
         .filter(id.eq_any(ids).and(deleted_at.is_null()))

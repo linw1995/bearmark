@@ -1,0 +1,24 @@
+[package]
+name = "bearmark-types"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+# Feature for OpenAPI documentation generation
+utoipa = ["dep:utoipa"]
+# Feature for database ORM integration
+diesel = ["dep:diesel", "dep:diesel-async"]
+
+[dependencies]
+# Core serialization
+serde.workspace = true
+time = { workspace = true, features = ["formatting", "parsing"] }
+
+# Optional dependencies with feature flags
+utoipa = { version = "5.3", optional = true }
+diesel = { version = "2.2", features = ["postgres", "time"], optional = true }
+diesel-async = { version = "0.6", features = ["postgres"], optional = true }
+
+# Error handling
+thiserror = "2.0"
