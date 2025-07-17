@@ -36,13 +36,21 @@ docker compose up -d
 open http://localhost:2284
 ```
 
+#### Environment Variables
+
+- `BM_API_KEY`: API key for authentication
+- `BM_UI_PATH`: Path to web UI static files (default: `./static` in container)
+- `BM_DATABASES_MAIN_URL`: Database connection URL
+
+The web interface is automatically served at the root path when `BM_UI_PATH` is configured.
+
 ## Integrations
 
-- Web viewer: [bearmark-web](https://github.com/linw1995/bearmark_web)
+- **Web UI**: Built-in web interface (`bearmark-web`)
 
-  Already integrated with Bearmark server.
-  Open the link <http://localhost:2284/> in your browser,
-  and input your API key.
+  The web interface is integrated within the Bearmark server.
+  Access it at <http://localhost:2284/> (or root path of your server).
+  Input your API key to start managing bookmarks.
 
 - Raycast Extension: [bearmark-raycast](https://github.com/linw1995/bearmark_raycast)
 
@@ -69,6 +77,23 @@ or use `direnv` to load nix environment automatically.
 # activate manually
 nix develop
 source .envrc
+```
+
+### Web UI Development
+
+The web interface is built with Leptos and served by the API server.
+
+```bash
+# Build the web interface
+trunk build
+
+# Set environment variable and run server with integrated web UI
+export BM_UI_PATH=./dist
+./scripts/cli.sh serve
+
+# For development with hot-reload (separate terminals)
+trunk serve  # Web UI development server on port 1420
+./scripts/cli.sh serve  # API server on port 8000
 ```
 
 ### Helpful Scripts
