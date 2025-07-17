@@ -94,6 +94,11 @@ diesel migration run
 
 ## API Structure
 
+### Framework
+
+- **bearmark-api** uses Rocket.rs as the web framework
+- For detailed Rocket.rs documentation and examples, use MCP Context7 to search `/rwf2/rocket`
+
 ### Core API Endpoints
 
 - `/api/bookmarks` - Bookmark CRUD operations
