@@ -45,7 +45,7 @@ pub fn BookmarksList(bookmarks: Vec<Bookmark>) -> impl IntoView {
                 <div class="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border border-gray-200 hover:border-blue-400 group transform hover:-translate-y-1 backdrop-blur-sm">
                     <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                         <h3 class="text-lg font-semibold text-gray-900 flex-1">
-                            <a href={url.clone()} target="_blank" rel="noopener noreferrer" 
+                            <a href={url.clone()} target="_blank" rel="noopener noreferrer"
                                class="text-blue-600 hover:text-blue-800 transition-colors duration-200 group-hover:text-blue-700 underline-offset-2 hover:underline">
                                 {title}
                             </a>
@@ -61,7 +61,7 @@ pub fn BookmarksList(bookmarks: Vec<Bookmark>) -> impl IntoView {
                         </div>
                     </div>
                     <div class="mb-4">
-                        <a href={url} target="_blank" rel="noopener noreferrer" 
+                        <a href={url} target="_blank" rel="noopener noreferrer"
                            class="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200 break-all bg-gray-50 hover:bg-blue-50 px-3 py-2 rounded-lg block border border-transparent hover:border-blue-200">
                             {url_display}
                         </a>

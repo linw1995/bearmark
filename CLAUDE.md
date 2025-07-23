@@ -51,16 +51,23 @@ OpenAPI documentation and embedded web UI.
 # Run API server only (default port 8000)
 ./scripts/cli.sh serve
 
-# Build web frontend (Leptos/WASM)
-trunk build  # Production build to dist/
+# Build web frontend (Leptos/WASM) - MUST run from project root
+trunk build  # Production build to dist/ (run from project root, not bearmark-web directory)
 
-# Run API server with integrated web UI
+# Run API server with integrated web UI (port 8000)
 export BM_UI_PATH=./dist
 ./scripts/cli.sh serve
+# OR use single command:
+BM_UI_PATH=./dist ./scripts/cli.sh serve
 
 # Development workflow with hot-reload
-trunk serve  # Web UI development server on port 1420
+trunk serve  # Web UI development server on port 1420 (run from project root)
 ./scripts/cli.sh serve  # API server on port 8000 (separate terminal)
+
+# Complete development workflow (recommended)
+# 1. Build web frontend first: trunk build
+# 2. Start integrated server: BM_UI_PATH=./dist ./scripts/cli.sh serve
+# 3. Access web UI at: http://localhost:8000/
 ```
 
 ### Testing and Quality Assurance
@@ -137,6 +144,8 @@ The web frontend (`bearmark-web`) uses:
 - API server serves static files when `BM_UI_PATH` is configured
 - Web UI is mounted at root path `/` alongside API routes at `/api/*`
 - Supports both development (hot-reload) and production (integrated) modes
+- **IMPORTANT**: All trunk commands (`trunk build`, `trunk serve`) must be run from project root directory, not from `bearmark-web/` subdirectory
+- **bearmark-web depends on bearmark-api**: The web frontend requires the API server to be running to fetch data from `/api/*` endpoints
 
 ## Cross-Platform Building
 
