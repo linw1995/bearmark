@@ -32,3 +32,5 @@ scripts/.crates2.json
 
 .cargo
 .claude/*.local.json
+
+node_modules

@@ -9,3 +9,6 @@ watch = ["bearmark-web"]
 [serve]
 port = 1420
 open = false
+
+[tools]
+tailwindcss = "4.1.11"

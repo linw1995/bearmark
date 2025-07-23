@@ -34,6 +34,11 @@
       in {
         devShells =
           {
+            web = pkgs.mkShell {
+              packages = with pkgs; [
+                nodejs
+              ];
+            };
             default = pkgs.mkShell {
               inherit nativeBuildInputs;
               inherit buildInputs;
