@@ -1,31 +1,40 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
 repos:
+  # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.3.0
+    rev: v4.4.0
     hooks:
-      - id: check-yaml
-      - id: end-of-file-fixer
       - id: trailing-whitespace
-  - repo: local
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-case-conflict
+
+  # Rust-specific hooks
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
     hooks:
+      # Format code
       - id: fmt
-        name: fmt
-        description: Format files with cargo fmt.
-        entry: cargo fmt
-        language: system
-        types: [rust]
-        args: ["--"]
-      - id: cargo-check
-        name: cargo check
-        description: Check the package for errors.
-        entry: cargo check
-        language: system
-        types: [rust]
-        pass_filenames: false
+        args: ["--verbose", "--"]
+
+      # Lint with clippy
       - id: clippy
-        name: clippy
-        description: Lint rust sources
-        entry: cargo clippy
-        language: system
-        args: ["--", "-D", "warnings"]
-        types: [rust]
-        pass_filenames: false
+        args: ["--all-targets", "--all-features", "--", "-D", "warnings"]
+
+      # Check that code compiles
+      - id: cargo-check
+        args: ["--all-targets", "--all-features"]
+
+  # Markdown-specific hooks
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.18.1
+    hooks:
+      - id: markdownlint-cli2
+
+# Configuration for specific hooks
+default_stages: [pre-commit]
+fail_fast: false

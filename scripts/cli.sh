@@ -12,7 +12,7 @@ help() {
 	echo "Actions:"
 	echo "  -h, --help: Display this help message"
 	echo ""
-	echo "  lint: Run clippy"
+	echo "  lint: Run lint"
 	echo ""
 	echo "  setup: Setup the project development environment"
 	echo "  teardown: Teardown the project development environment"
@@ -20,10 +20,6 @@ help() {
 	echo "  serve: Run the api server"
 	echo "  test: Run tests"
 	echo "  coverage: Run tests with coverage"
-	echo ""
-	echo "  install-deps: Install all dependencies"
-	echo "  install-diesel: Install diesel_cli"
-	echo "  install-tarpaulin: Install tarpaulin"
 }
 
 cleanup_profraw_files() {
@@ -52,7 +48,7 @@ main() {
 		;;
 	"lint")
 		echo ">>> Running clippy"
-		cargo clippy --all-features "$@"
+		pre-commit run --all-files
 		cleanup_profraw_files
 		;;
 	"setup")
@@ -93,34 +89,14 @@ export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
 		;;
 	"coverage")
 		echo ">>> Running tests with coverage"
-		if [[ -z "${CI-}" ]]; then
-			./scripts/bin/cargo-tarpaulin $tarpaulin_args "$@"
-		else
-			cargo tarpaulin $tarpaulin_args "$@"
-		fi
+		cargo tarpaulin $tarpaulin_args "$@"
 		echo "open file ./tarpaulin-report.html to see coverage report"
 		cleanup_profraw_files
 		;;
 	"coverage-xml")
 		echo ">>> Running tests with coverage"
-		if [[ -z "${CI-}" ]]; then
-			./scripts/bin/cargo-tarpaulin $tarpaulin_xml_args "$@"
-		else
-			cargo tarpaulin $tarpaulin_xml_args "$@"
-		fi
+		cargo tarpaulin $tarpaulin_xml_args "$@"
 		cleanup_profraw_files
-		;;
-	"install-deps")
-		$0 install-diesel
-		$0 install-tarpaulin
-		;;
-	"install-diesel")
-		echo ">>> Installing diesel_cli"
-		cargo install diesel_cli --no-default-features --features postgres --root ./scripts
-		;;
-	"install-tarpaulin")
-		echo ">>> Installing tarpaulin"
-		cargo install cargo-tarpaulin --root ./scripts --git https://github.com/xd009642/tarpaulin.git
 		;;
 	*)
 		echo "Error: Unknown action '$action'"

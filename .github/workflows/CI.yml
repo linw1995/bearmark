@@ -1,34 +1,30 @@
-name: Continuous Integration
+name: "CI"
 
 on:
+  pull_request:
   push:
     branches: ["main"]
-    paths:
-      - .github/workflows/CI.yml
-      - .cargo/config.toml
-      - Cargo.toml
-      - Cargo.lock
-      - bearmark-*/Cargo.toml
-      - bearmark-*/**/*.rs
-      - scripts/cli.sh
-  pull_request:
-    branches: ["main"]
-    paths:
-      - .github/workflows/CI.yml
-      - .cargo/config.toml
-      - Cargo.toml
-      - Cargo.lock
-      - bearmark-*/Cargo.toml
-      - bearmark-*/**/*.rs
-      - scripts/cli.sh
-
+  schedule:
+    # Run every Friday at 00:00 UTC
+    - cron: "0 0 * * 5"
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  CI:
+  lint:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-nix
 
+      - name: Run lints
+        run: |
+          ./scripts/cli.sh lint
+
+  test:
+    needs:
+      - lint
+    runs-on: ubuntu-latest
     services:
       db:
         image: postgres:12
@@ -46,41 +42,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
-        run: |
-          sudo apt install -yq \
-            build-essential \
-            libssl-dev \
-            pkg-config
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: clippy, rustfmt
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
-      - name: cargo-install cargo-tarpaulin
-        uses: baptiste0928/cargo-install@v3
-        with:
-          crate: cargo-tarpaulin
-          git: https://github.com/xd009642/tarpaulin.git
-      - name: cargo-install diesel_cli
-        uses: baptiste0928/cargo-install@v3
-        with:
-          crate: diesel_cli
-          features: postgres
-          args: --no-default-features
+      - uses: ./.github/actions/setup-nix
+
       - name: Setup
         run: |
           ./scripts/cli.sh setup
         env:
           POSTGRES_HOST: localhost
           POSTGRES_PORT: 5432
-
-      - name: Run lints
-        run: |
-          ./scripts/cli.sh lint
-        env:
-          SCCACHE_GHA_ENABLED: "true"
-          RUSTC_WRAPPER: "sccache"
 
       - name: Run tests with coverage
         run: |
@@ -96,4 +65,4 @@ jobs:
         with:
           file: ./cobertura.xml
           token: ${{secrets.CODECOV_TOKEN}} # not required for public repos
-          fail_ci_if_error: true
+          fail_ci_if_error: github.actor != 'dependabot[bot]'
