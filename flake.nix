@@ -20,7 +20,6 @@
             inputs.fenix.overlays.default
           ];
         };
-        lib = pkgs.lib;
         packages = with pkgs; [
           pre-commit
           diesel-cli
@@ -35,7 +34,6 @@
             "rustfmt"
             "rust-analyzer"
           ])
-          pkg-config
         ];
         buildInputs = with pkgs; [
           postgresql.dev
