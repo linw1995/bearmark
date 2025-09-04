@@ -48,15 +48,14 @@ jobs:
         run: |
           ./scripts/cli.sh setup
         env:
-          POSTGRES_HOST: localhost
-          POSTGRES_PORT: 5432
+          BM_DATABASES: "{main={url=\"postgres://postgres:example@localhost:5432/bearmark\"}}"
 
       - name: Run tests with coverage
         run: |
-          source .envrc
           ./scripts/cli.sh coverage-xml
         env:
           RUST_LOG: bearmark=debug,rocket=info
+          BM_DATABASES: "{main={url=\"postgres://postgres:example@localhost:5432/bearmark\"}}"
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v4
