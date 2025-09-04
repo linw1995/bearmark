@@ -166,17 +166,16 @@ pub async fn search_bookmarks(
         let query = parse_query(query, &bump)?;
         builder = builder.filter(find_bookmarks(&query, cwd, &mut cwd_overwrited)?)
     }
-    if !cwd_overwrited {
-        if let Some(cwd) = cwd {
-            if cwd != "/" {
-                let expression = if cwd == "//" {
-                    Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
-                } else {
-                    find_bookmarks_in_path(cwd)?
-                };
-                builder = builder.filter(expression);
-            }
-        }
+    if !cwd_overwrited
+        && let Some(cwd) = cwd
+        && cwd != "/"
+    {
+        let expression = if cwd == "//" {
+            Box::new(bookmarks::dsl::folder_id.is_null()) // special syntax. search bookmarks which are not in any folder
+        } else {
+            find_bookmarks_in_path(cwd)?
+        };
+        builder = builder.filter(expression);
     }
 
     if before > 0 {
