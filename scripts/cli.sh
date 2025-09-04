@@ -29,7 +29,7 @@ cleanup_profraw_files() {
 cd "$(dirname "$0")"/../
 
 tarpaulin_args="--workspace --include-tests --skip-clean --out html --engine llvm -- --show-output --test-threads 1"
-tarpaulin_xml_args="--workspace --include-tests --skip-clean --out xml --engine llvm -- --show-output --test-threads 1"
+tarpaulin_xml_args="--workspace --include-tests --skip-clean --out xml --engine llvm --verbose -- --show-output --test-threads 1"
 
 main() {
 	action=${1-}
