@@ -60,7 +60,7 @@ export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
 		else
 			echo ">>> Skip setting up the project development environment"
 			echo ">>> Setting up database"
-			DATABASE_URL=$url diesel migration run
+			diesel migration run
 		fi
 		echo ">>> Done"
 		;;
