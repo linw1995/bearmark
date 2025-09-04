@@ -56,7 +56,7 @@ main() {
 			echo "use flake
                         export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
 			echo ">>> Setting up database"
-			DATABASE_URL=$url ./scripts/bin/diesel migration run
+			DATABASE_URL=$url diesel migration run
 		else
 			echo ">>> Skip setting up the project development environment"
 			echo ">>> Setting up database"
