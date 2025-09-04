@@ -66,6 +66,9 @@
             inherit nativeBuildInputs;
             inherit buildInputs;
             inherit packages;
+            profile = ''
+            unset LD_LIBRARY_PATH
+            '';
           };
         };
       }
