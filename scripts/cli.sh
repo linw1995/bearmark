@@ -54,7 +54,7 @@ main() {
 
 			url=postgres://postgres:example@${POSTGRES_HOST-localhost}:${POSTGRES_PORT-5432}/${POSTGRES_DB-bearmark}
 			echo "use flake
-export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
+                        export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
 			echo ">>> Setting up database"
 			DATABASE_URL=$url ./scripts/bin/diesel migration run
 		else

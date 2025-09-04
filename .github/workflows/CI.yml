@@ -48,7 +48,7 @@ jobs:
         run: |
           ./scripts/cli.sh setup
         env:
-          BM_DATABASES: "{main={url=\"postgres://postgres:example@localhost:5432/bearmark\"}}"
+          DATABASE_URL: postgres://postgres:example@localhost:5432/bearmark
 
       - name: Run tests with coverage
         run: |
