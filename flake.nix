@@ -54,7 +54,7 @@
               pname = name;
               inherit version;
               meta = {
-                description = "Bearmark server";
+                description = "Bearmark Server";
                 mainProgram = name;
               };
               src = ./.;
@@ -66,9 +66,6 @@
             inherit nativeBuildInputs;
             inherit buildInputs;
             inherit packages;
-            profile = ''
-            unset LD_LIBRARY_PATH
-            '';
           };
         };
       }
