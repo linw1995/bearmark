@@ -12,7 +12,7 @@ help() {
 	echo "Actions:"
 	echo "  -h, --help: Display this help message"
 	echo ""
-	echo "  lint: Run clippy"
+	echo "  lint: Run lint"
 	echo ""
 	echo "  setup: Setup the project development environment"
 	echo "  teardown: Teardown the project development environment"
@@ -20,10 +20,6 @@ help() {
 	echo "  serve: Run the api server"
 	echo "  test: Run tests"
 	echo "  coverage: Run tests with coverage"
-	echo ""
-	echo "  install-deps: Install all dependencies"
-	echo "  install-diesel: Install diesel_cli"
-	echo "  install-tarpaulin: Install tarpaulin"
 }
 
 cleanup_profraw_files() {
@@ -33,11 +29,7 @@ cleanup_profraw_files() {
 cd "$(dirname "$0")"/../
 
 tarpaulin_args="--workspace --include-tests --skip-clean --out html --engine llvm -- --show-output --test-threads 1"
-tarpaulin_xml_args="--workspace --include-tests --skip-clean --out xml --engine llvm -- --show-output --test-threads 1"
-
-export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
-export DYLD_LIBRARY_PATH="$(rustc --print sysroot)/lib:${DYLD_LIBRARY_PATH-}" # MacOS
-export LD_LIBRARY_PATH="$(rustc --print sysroot)/lib:${LD_LIBRARY_PATH-}"     # Linux
+tarpaulin_xml_args="--workspace --include-tests --skip-clean --out xml --engine llvm --verbose -- --show-output --test-threads 1"
 
 main() {
 	action=${1-}
@@ -52,7 +44,7 @@ main() {
 		;;
 	"lint")
 		echo ">>> Running clippy"
-		cargo clippy --all-features "$@"
+		pre-commit run --all-files
 		cleanup_profraw_files
 		;;
 	"setup")
@@ -62,15 +54,13 @@ main() {
 
 			url=postgres://postgres:example@${POSTGRES_HOST-localhost}:${POSTGRES_PORT-5432}/${POSTGRES_DB-bearmark}
 			echo "use flake
-export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
-			echo ">>> Setting up database"
-			DATABASE_URL=$url ./scripts/bin/diesel migration run
-		else
-			echo ">>> Skip setting up the project development environment"
-			url=postgres://postgres:example@${POSTGRES_HOST-db}:${POSTGRES_PORT-5432}/${POSTGRES_DB-bearmark}
-			echo "export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
+                        export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
 			echo ">>> Setting up database"
 			DATABASE_URL=$url diesel migration run
+		else
+			echo ">>> Skip setting up the project development environment"
+			echo ">>> Setting up database"
+			diesel migration run
 		fi
 		echo ">>> Done"
 		;;
@@ -93,34 +83,14 @@ export BM_DATABASES='{main={url=\"$url\"}}'" >.envrc
 		;;
 	"coverage")
 		echo ">>> Running tests with coverage"
-		if [[ -z "${CI-}" ]]; then
-			./scripts/bin/cargo-tarpaulin $tarpaulin_args "$@"
-		else
-			cargo tarpaulin $tarpaulin_args "$@"
-		fi
+		cargo tarpaulin $tarpaulin_args "$@"
 		echo "open file ./tarpaulin-report.html to see coverage report"
 		cleanup_profraw_files
 		;;
 	"coverage-xml")
 		echo ">>> Running tests with coverage"
-		if [[ -z "${CI-}" ]]; then
-			./scripts/bin/cargo-tarpaulin $tarpaulin_xml_args "$@"
-		else
-			cargo tarpaulin $tarpaulin_xml_args "$@"
-		fi
+		cargo tarpaulin $tarpaulin_xml_args "$@"
 		cleanup_profraw_files
-		;;
-	"install-deps")
-		$0 install-diesel
-		$0 install-tarpaulin
-		;;
-	"install-diesel")
-		echo ">>> Installing diesel_cli"
-		cargo install diesel_cli --no-default-features --features postgres --root ./scripts
-		;;
-	"install-tarpaulin")
-		echo ">>> Installing tarpaulin"
-		cargo install cargo-tarpaulin --root ./scripts --git https://github.com/xd009642/tarpaulin.git
 		;;
 	*)
 		echo "Error: Unknown action '$action'"
