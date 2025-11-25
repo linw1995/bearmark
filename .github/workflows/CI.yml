@@ -80,7 +80,7 @@ jobs:
           BM_DATABASES: "{main={url=\"postgres://postgres:example@localhost:5432/bearmark\"}}"
 
       - name: Upload to codecov.io
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./cobertura.xml
           token: ${{secrets.CODECOV_TOKEN}} # not required for public repos
