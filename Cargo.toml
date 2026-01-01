@@ -8,7 +8,7 @@ version = "0.2.0"
 
 [workspace.dependencies]
 # allocation
-bumpalo = "3.17"
+bumpalo = "3.19"
 # logging
 tracing = "0.1"
 tracing-appender = "0.2"
