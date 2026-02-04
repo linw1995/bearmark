@@ -17,9 +17,18 @@ help() {
 	echo "  setup: Setup the project development environment"
 	echo "  teardown: Teardown the project development environment"
 	echo "  db-console: Open the database console"
+	echo ""
 	echo "  serve: Run the api server"
+	echo "  web-build: Build the web frontend"
+	echo "  web-serve: Build web and serve via API server"
+	echo "  web-watch: Dev mode with hot reload (trunk serve + api)"
+	echo ""
 	echo "  test: Run tests"
 	echo "  coverage: Run tests with coverage"
+	echo ""
+	echo "Environment variables:"
+	echo "  BM_ADDRESS  Listen address (default: 127.0.0.1)"
+	echo "  BM_PORT     Listen port (default: 8080)"
 }
 
 cleanup_profraw_files() {
@@ -75,6 +84,38 @@ main() {
 	"serve")
 		echo ">>> Running the api server"
 		cargo run --package bearmark-api --bin serve
+		;;
+	"web-build")
+		echo ">>> Building bearmark-web"
+		cd bearmark-web && trunk build --release
+		echo ">>> Done: bearmark-web/dist"
+		;;
+	"web-serve")
+		echo ">>> Building bearmark-web"
+		cd bearmark-web && trunk build --release
+		echo ">>> Running the api server with web UI"
+		cd ..
+		BM_UI_PATH="$(pwd)/bearmark-web/dist" cargo run --package bearmark-api --bin serve
+		;;
+	"web-watch")
+		HOST="${BM_ADDRESS:-127.0.0.1}"
+		PORT="${BM_PORT:-8080}"
+		API_PORT="18000"  # internal
+
+		echo ">>> Starting development mode with hot reload"
+		echo ">>> Open http://${HOST}:${PORT}"
+		echo ""
+		echo ">>> Starting API server in background..."
+		BM_ADDRESS="$HOST" BM_PORT="$API_PORT" cargo run --package bearmark-api --bin serve &
+		API_PID=$!
+		trap "kill $API_PID 2>/dev/null || true" EXIT
+		sleep 2
+		echo ">>> Starting trunk serve with proxy to API"
+		cd bearmark-web && trunk serve \
+			--address "$HOST" \
+			--port "$PORT" \
+			--proxy-rewrite "/api/" \
+			--proxy-backend "http://${HOST}:${API_PORT}/api/"
 		;;
 	"test")
 		echo ">>> Running tests"

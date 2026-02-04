@@ -1,0 +1,14 @@
+{
+  "name": "bearmark-web",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "css": "tailwindcss -i input.css -o public/output.css",
+    "css:watch": "tailwindcss -i input.css -o public/output.css --watch",
+    "css:build": "tailwindcss -i input.css -o public/output.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4",
+    "daisyui": "^4.12"
+  }
+}

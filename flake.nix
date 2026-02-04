@@ -24,15 +24,17 @@
           pre-commit
           diesel-cli
           cargo-tarpaulin
+          trunk
         ];
-        nativeBuildInputs = with pkgs; [
-          (fenix.stable.withComponents [
-            "cargo"
-            "clippy"
-            "rust-src"
-            "rustc"
-            "rustfmt"
-            "rust-analyzer"
+        nativeBuildInputs = with pkgs.fenix; [
+          (combine [
+            stable.cargo
+            stable.clippy
+            stable.rust-src
+            stable.rustc
+            stable.rustfmt
+            stable.rust-analyzer
+            targets.wasm32-unknown-unknown.stable.rust-std
           ])
         ];
         buildInputs = with pkgs; [

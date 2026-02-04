@@ -1,0 +1,12 @@
+# Build output
+/dist/
+/target/
+
+# Dependencies
+/node_modules/
+
+# Package lock (use Cargo.lock in workspace root)
+package-lock.json
+
+# Tailwind output (regenerated on build)
+/public/output.css
