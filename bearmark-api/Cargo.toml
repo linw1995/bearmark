@@ -28,7 +28,7 @@ bumpalo.workspace = true
 # other utilities
 ##################
 serde = { version = "1.0", features = ["derive"] }
-rand = "0.9"
+rand = "0.10"
 itertools = "0.14"
 time = { version = "0.3", features = ["local-offset", "macros", "serde"] }
 percent-encoding = "2.3"
