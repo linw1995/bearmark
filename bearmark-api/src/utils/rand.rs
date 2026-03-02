@@ -1,9 +1,9 @@
 pub fn rand_str(length: usize) -> String {
-    use rand::Rng;
+    use rand::RngExt;
     use rand::distr::Alphanumeric;
 
     rand::rng()
-        .sample_iter(&Alphanumeric)
+        .sample_iter(Alphanumeric)
         .take(length)
         .map(char::from)
         .collect()
