@@ -53,7 +53,7 @@ jobs:
         with:
           components: clippy, rustfmt
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
+        uses: mozilla-actions/sccache-action@v0.0.10
       - name: cargo-install cargo-tarpaulin
         uses: baptiste0928/cargo-install@v3
         with:
