@@ -23,7 +23,7 @@ pub enum Query<'a> {
 
 #[cfg(test)]
 #[cfg(not(tarpaulin_include))]
-#[ctor::ctor]
+#[ctor::ctor(unsafe)]
 fn init() {
     use std::io;
     use tracing_subscriber::{EnvFilter, prelude::*};
