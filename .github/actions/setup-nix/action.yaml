@@ -38,5 +38,5 @@ runs:
         echo 'use flake' >.envrc
     - uses: HatsuneMiku3939/direnv-action@v1
       with:
-        direnvVersion: 2.36.0
+        direnvVersion: 2.37.1
     # and avoid develop env being gc
