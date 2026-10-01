@@ -49,7 +49,7 @@ jobs:
             build-essential \
             libssl-dev \
             pkg-config
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           components: clippy, rustfmt
       - name: Run sccache-cache
