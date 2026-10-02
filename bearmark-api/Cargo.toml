@@ -45,7 +45,6 @@ thiserror = "2.0"
 # API Doc Gen
 utoipa = "5.3"
 utoipa-swagger-ui = { version = "9.0", features = ["rocket"] }
-utoipa-rapidoc = { version = "6.0", features = ["rocket"] }
 zip = { version = ">=2.4, <8.7" }                               # Pin to avoid compilation errors with `utoipa-swagger-ui` in version 2.5
 
 [dev-dependencies]
